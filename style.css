@@ -1182,3 +1182,5 @@ body[data-tab="home"][data-view="simple"] .sc-txt h2{font-size:17px}
 .panel .snzgo{background:rgba(141,123,240,.12);color:var(--lav)}
 .row.snz{opacity:.78}
 .row .snzl,.ptile .pd{overflow-wrap:anywhere}
+/* v80 : pause sur une seule ligne */
+.snzrow{margin-top:10px}.snzrow b{color:var(--lav)}

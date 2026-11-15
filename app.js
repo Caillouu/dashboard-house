@@ -271,10 +271,8 @@
       '<div class="main"><span class="t">'+esc(r.title)+'</span><span class="sub">'+esc(st.txt)+'</span>'+(st.snz?'<span class="sub snzl">💤 En pause jusqu\'au '+snzDate(r)+'</span>':'')+'</div></div>';
   }
   function snoozeHtml(r){
-    if(snoozed(r))return '<div class="lab">En pause</div><div class="snzbox"><span>💤 Cachée de la liste « À faire » jusqu\'au <b>'+snzDate(r)+'</b></span><button class="lnk" data-act="snooze-clear" data-id="'+esc(r.id)+'">Reprendre maintenant</button></div>';
-    return '<div class="lab">Mettre en pause</div><div class="snzbox"><div class="snzchips">'+[3,7,14,30].map(function(n){return '<button class="snzc" data-act="snooze" data-id="'+esc(r.id)+'" data-n="'+n+'">'+n+' j</button>'}).join('')+'</div>'+
-      '<div class="thr">Ou <input class="in" type="number" min="1" max="365" data-snzn value="" placeholder="X" aria-label="Nombre de jours de pause"> jours <button class="btn snzgo" data-act="snooze" data-id="'+esc(r.id)+'">Pause</button></div>'+
-      '<div class="hint">Elle revient dans « À faire » à la fin de la pause.</div></div>';
+    if(snoozed(r))return '<div class="thr snzrow">💤 En pause jusqu\'au <b>'+snzDate(r)+'</b> <button class="lnk" data-act="snooze-clear" data-id="'+esc(r.id)+'">Reprendre</button></div>';
+    return '<div class="thr snzrow">💤 Pause <input class="in" type="number" min="1" max="365" data-snzn value="7" aria-label="Nombre de jours de pause"> jours <button class="btn snzgo" data-act="snooze" data-id="'+esc(r.id)+'">OK</button></div>';
   }
   function panelHtml(r){
     var st=careState(r),un=r.everyUnit==='sem'?'sem':'j';
@@ -286,7 +284,6 @@
       '<hr class="sep">'+
       '<div class="lab">Rappel</div>'+
       '<div class="thr">Tous les <input class="in" type="number" min="1" max="999" data-field="everyN" value="'+esc(r.everyN||'')+'" aria-label="Fréquence"> <select class="in" data-field="everyUnit" aria-label="Unité"><option value="j"'+(un==='j'?' selected':'')+'>jours</option><option value="sem"'+(un==='sem'?' selected':'')+'>semaines</option></select></div>'+
-      '<hr class="sep">'+
       snoozeHtml(r)+
       '<hr class="sep">'+
       '<div class="lab">Icône et titre</div>'+
