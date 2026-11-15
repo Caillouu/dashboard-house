@@ -109,7 +109,7 @@
     Object.assign(o,t);
     c.forEach(function(f,j){if(f!=='_t')o[f]=r[j]==null?'':String(r[j]).trim()});
     if(!o.createdAt)o.createdAt=9e12+i;
-    if(k==='routines'){o.lastDone=nDate(o.lastDone);o.everyN=o.everyN?(Number(String(o.everyN).replace(',','.'))||''):'';o.everyUnit=/^s/i.test(o.everyUnit)?'sem':'j';o.mode='rec';
+    if(k==='routines'){o.lastDone=nDate(o.lastDone);o.snoozeUntil=nDate(o.snoozeUntil);o.everyN=o.everyN?(Number(String(o.everyN).replace(',','.'))||''):'';o.everyUnit=/^s/i.test(o.everyUnit)?'sem':'j';o.mode='rec';
       var g=nrm(o.group);o.group=g.indexOf('plant')===0?'Plantes':g.indexOf('kim')===0||g.indexOf('chien')===0?'Kimchi':'Maison'}
     if(k==='shop'){o.budget=o.budget?(Number(String(o.budget).replace(/[^\d.,]/g,'').replace(',','.'))||''):'';
       var w=nrm(o.who);o.who=(PEOPLE.p1&&w===nrm(PEOPLE.p1))?'p1':(PEOPLE.p2&&w===nrm(PEOPLE.p2))?'p2':'couple';o.urgency=URG[nrm(o.urgency)]||'med';o.done=yes(o.done)}
@@ -243,6 +243,10 @@
   }
   var QEMO=['🔧','🍷','🥬','🎁','🏠','🪴','🧹','🎨','📦','🛒','✈️','🎄','🍳','📚','🛠️','🎉'];
   var EMO=['🛁','💊','🦴','🐕','🪴','🌿','💧','🚿','🧹','🧺','🍽️','🗑️','🔧','🧴'];
+  /* Pause : une tâche « en pause » disparaît des listes À faire jusqu'à la date snoozeUntil (stockée dans _t) */
+  function snoozed(r){return !!r.snoozeUntil&&r.snoozeUntil>iso(new Date())}
+  function snzDate(r){var m=String(r.snoozeUntil||'').match(/^\d{4}-(\d\d)-(\d\d)$/);return m?m[2]+'/'+m[1]:''}
+  function isDue(x){return !snoozed(x.r)&&(x.st.c==='r'||x.st.c==='o')}
   function careState(r){
     var has=!!r.lastDone, d=has?-diff(r.lastDone):null, c='n', txt='À renseigner';
     if(has){
@@ -252,19 +256,25 @@
     }
     if(r.forceColor&&/^[gorn]$/.test(r.forceColor))c=r.forceColor;
     if(r.customText)txt=String(r.customText).replace(/^\S+ (il y a)/i,function(){return 'Il y a'});
-    return {c:c,txt:txt};
+    return {c:c,txt:txt,snz:snoozed(r)};
   }
   /* Règle unique : le rond = marquer comme fait (ou annuler si fait aujourd'hui), le texte = ouvrir le détail */
   function careChk(r){var on=r.lastDone===iso(new Date())||careState(r).c==='g'; /* vert = à jour = déjà coché */
     return '<button class="chk care-chk'+(on?' on':'')+'" data-act="care-chk" data-id="'+esc(r.id)+'" aria-pressed="'+on+'" aria-label="'+(r.lastDone===iso(new Date())?'Annuler, pas encore fait : ':on?'À jour, refait aujourd\'hui : ':'Fait aujourd\'hui : ')+esc(r.title)+'">'+CHECK+'</button>'}
   function careToggle(id){var r=find('routines',id);if(!r)return;
     if(r.lastDone===iso(new Date())&&r.hasPrev){undoDate(id);toastMsg('Remis comme avant');return}
-    var before=dueList().length;var pv=snap('routines',id,['lastDone','hasPrev','prevDone','prevForce','prevCustom','forceColor','customText']);setDate(id,iso(new Date()));offerUndo('routines',id,pv,'Marqué comme fait ✓');if(before>0&&!dueList().length)celebrate()}
+    var before=dueList().length;var pv=snap('routines',id,['lastDone','hasPrev','prevDone','prevForce','prevCustom','forceColor','customText','snoozeUntil']);setDate(id,iso(new Date()));offerUndo('routines',id,pv,'Marqué comme fait ✓');if(before>0&&!dueList().length)celebrate()}
   function careRow(r){
     var st=careState(r);
-    return '<div class="row '+st.c+' care" role="button" tabindex="0" aria-haspopup="dialog" data-act="care-open" data-id="'+esc(r.id)+'">'+careChk(r)+
+    return '<div class="row '+st.c+(st.snz?' snz':'')+' care" role="button" tabindex="0" aria-haspopup="dialog" data-act="care-open" data-id="'+esc(r.id)+'">'+careChk(r)+
       (r.emoji?'<span class="em" aria-hidden="true">'+esc(r.emoji)+'</span>':'<span class="dot"></span>')+
-      '<div class="main"><span class="t">'+esc(r.title)+'</span><span class="sub">'+esc(st.txt)+'</span></div></div>';
+      '<div class="main"><span class="t">'+esc(r.title)+'</span><span class="sub">'+esc(st.txt)+'</span>'+(st.snz?'<span class="sub snzl">💤 En pause jusqu\'au '+snzDate(r)+'</span>':'')+'</div></div>';
+  }
+  function snoozeHtml(r){
+    if(snoozed(r))return '<div class="lab">En pause</div><div class="snzbox"><span>💤 Cachée de la liste « À faire » jusqu\'au <b>'+snzDate(r)+'</b></span><button class="lnk" data-act="snooze-clear" data-id="'+esc(r.id)+'">Reprendre maintenant</button></div>';
+    return '<div class="lab">Mettre en pause</div><div class="snzbox"><div class="snzchips">'+[3,7,14,30].map(function(n){return '<button class="snzc" data-act="snooze" data-id="'+esc(r.id)+'" data-n="'+n+'">'+n+' j</button>'}).join('')+'</div>'+
+      '<div class="thr">Ou <input class="in" type="number" min="1" max="365" data-snzn value="" placeholder="X" aria-label="Nombre de jours de pause"> jours <button class="btn snzgo" data-act="snooze" data-id="'+esc(r.id)+'">Pause</button></div>'+
+      '<div class="hint">Elle revient dans « À faire » à la fin de la pause.</div></div>';
   }
   function panelHtml(r){
     var st=careState(r),un=r.everyUnit==='sem'?'sem':'j';
@@ -276,6 +286,8 @@
       '<hr class="sep">'+
       '<div class="lab">Rappel</div>'+
       '<div class="thr">Tous les <input class="in" type="number" min="1" max="999" data-field="everyN" value="'+esc(r.everyN||'')+'" aria-label="Fréquence"> <select class="in" data-field="everyUnit" aria-label="Unité"><option value="j"'+(un==='j'?' selected':'')+'>jours</option><option value="sem"'+(un==='sem'?' selected':'')+'>semaines</option></select></div>'+
+      '<hr class="sep">'+
+      snoozeHtml(r)+
       '<hr class="sep">'+
       '<div class="lab">Icône et titre</div>'+
       iconField(r.emoji,'data-field="name"',r.title,'Titre','data-act="pick-emoji" data-id="'+esc(r.id)+'"',EMO,r.emoji)+
@@ -313,7 +325,7 @@
     return '<svg class="pa" viewBox="0 0 100 120" preserveAspectRatio="xMidYMax meet" aria-hidden="true">'+PL[k]+'<path d="M32 104h36l-4 16H36z" fill="#E7B896"/></svg>'}
   function plantTile(r){
     var st=careState(r),lab={g:'Ça va, merci !',o:"J'ai un peu soif…",r:"J'ai soooif !",n:'À renseigner'}[st.c],
-      d=r.lastDone?st.txt:'';
+      d=(r.lastDone?st.txt:'')+(st.snz?' · 💤 pause jusqu\'au '+snzDate(r):'');
     return '<div class="ptile '+st.c+'" role="button" tabindex="0" aria-haspopup="dialog" data-act="care-open" data-id="'+esc(r.id)+'">'+plantArt(r)+careChk(r)+
       '<div class="pt"><span class="pn">'+esc(r.title)+'</span><span class="ps">'+lab+'</span><span class="pd">'+esc(d||'')+'</span></div></div>';
   }
@@ -337,7 +349,7 @@
       '<div class="prow"><button class="lnk" data-act="ag-detail">Voir la vue détaillée</button><a class="btn ghost" href="https://calendar.google.com/calendar/u/0/r/week" target="_blank" rel="noopener noreferrer" data-close>Google Agenda ↗</a></div></div>'}
   function renderHub(){renderHub3()}
   /* ---- Onglet « Test » : vue simple v2 — une grande carte « Aujourd'hui » (quête, 3 choses, vacances) + un dock de raccourcis ---- */
-  function dueList(){var R={r:0,o:1};return S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(function(x){return x.st.c==='r'||x.st.c==='o'}).sort(function(a,b){return R[a.st.c]-R[b.st.c]})}
+  function dueList(){var R={r:0,o:1};return S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue).sort(function(a,b){return R[a.st.c]-R[b.st.c]})}
   /* Kimchi réagit au moment, à la météo et au voyage — pas aux choses à faire (elles sont juste en dessous) */
   function kimchiSays(due,nt,ts){var h=new Date().getHours(),hi=h<6?'Bonne nuit':h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir',c=W&&W.cond,day=W?W.isDay!==false:h>=8&&h<18,t;
     if(nt&&ts.k==='now')t='Profitez bien de '+nt.title+' 🌴';
@@ -474,7 +486,7 @@
   /* Routines : checklist globale de tout ce qui est en retard (rouge) ou bientôt dû (orange) */
   function renderTodoAll(){var el=$('l-todoall');if(!el)return;
     var R={r:0,o:1},GL={Kimchi:'Kimchi',Plantes:'Plantes',Maison:'Maison'};
-    var L=S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(function(x){return x.st.c==='r'||x.st.c==='o'})
+    var L=S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue)
       .sort(function(a,b){if(R[a.st.c]!==R[b.st.c])return R[a.st.c]-R[b.st.c];return (a.r.lastDone||'')<(b.r.lastDone||'')?-1:1});
     var td=iso(new Date()),dn=S.routines.filter(function(r){return r.lastDone===td}).length,c=$('ta-count');if(c)c.textContent=(L.length+dn)?dn+'/'+(L.length+dn):'';
     el.innerHTML=L.length?L.map(function(x){var r=x.r;return '<div class="tarow '+x.st.c+'">'+careChk(r)+
@@ -482,7 +494,7 @@
       :'<p class="empty">'+(loaded.routines?'Tout est à jour ✨':'Chargement…')+'</p>'}
   function setDate(id,val){
     var r=find('routines',id);if(!r)return;
-    upd('routines',id,{lastDone:val||null,hasPrev:true,prevDone:r.lastDone||null,prevForce:r.forceColor||null,prevCustom:r.customText||null,forceColor:null,customText:null});
+    upd('routines',id,{lastDone:val||null,hasPrev:true,prevDone:r.lastDone||null,prevForce:r.forceColor||null,prevCustom:r.customText||null,forceColor:null,customText:null,snoozeUntil:null});
   }
   function undoDate(id){
     var r=find('routines',id);if(!r)return;
@@ -1162,7 +1174,7 @@
         (ss.length?'<div class="bar tq-bar"><i style="width:'+Math.round(dn/ss.length*100)+'%"></i></div><ul class="tq-steps">'+steps+'</ul>':'<button class="tq-st tq-add" data-act="proj-open" data-id="'+id+'">+ Ajoute une première étape</button>')+
         (ss.length&&nx<0?'<div class="tq-row"><span class="tq-win">Quête accomplie 🎉</span><button class="btn tq-next" data-act="main-finish" data-id="'+id+'">Choisir la suivante</button></div>':'')+'</div>'}
     else h+='<button class="tq tq-none" data-act="qview-open"><span class="tq-k">📌 Pas de quête principale</span><span class="tq-t"><span>Ouvre les quêtes et épingles-en une</span></span></button>';
-    var R={r:0,o:1},due=S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(function(x){return x.st.c==='r'||x.st.c==='o'}).sort(function(a,b){return R[a.st.c]-R[b.st.c]});
+    var R={r:0,o:1},due=S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue).sort(function(a,b){return R[a.st.c]-R[b.st.c]});
     h+='<div class="tsec">À faire'+(due.length?' <i>'+due.length+'</i>':'')+'</div>'+(due.length?due.map(function(x){var r=x.r;return '<div class="tarow '+x.st.c+'">'+careChk(r)+'<div class="main" role="button" tabindex="0" data-act="care-open" data-id="'+esc(r.id)+'"><span class="t">'+(r.emoji?esc(r.emoji)+' ':'')+esc(r.title)+'</span><span class="sub">'+esc((r.group||'Maison')+' · '+x.st.txt)+'</span></div></div>'}).join(''):'<p class="tempty">'+(loaded.routines?'Tout est à jour ✨':'Chargement…')+'</p>');
     el.innerHTML=h;
   }
@@ -1230,8 +1242,12 @@
     else if(a==='view-set'){setView(b.getAttribute('data-v'))}
     else if(a==='view-toggle'){setView(VIEW==='simple'?'detail':'simple')}
     else if(a==='ag-detail'){agOpen=false;renderSheet();setView('detail');setTimeout(function(){var c=document.querySelector('.s-cal');if(c)c.scrollIntoView({block:'start'})},60)}
-    else if(a==='ta-done'){var pv2=snap('routines',id,['lastDone','hasPrev','prevDone','prevForce','prevCustom','forceColor','customText']);setDate(id,iso(new Date()));offerUndo('routines',id,pv2,'Marqué comme fait ✓')}
-    else if(a==='done-today'){var pv=snap('routines',id,['lastDone','hasPrev','prevDone','prevForce','prevCustom','forceColor','customText']);openId=null;calFor=null;setDate(id,iso(new Date()));renderSheet();offerUndo('routines',id,pv,'Marqué comme fait ✓')}
+    else if(a==='ta-done'){var pv2=snap('routines',id,['lastDone','hasPrev','prevDone','prevForce','prevCustom','forceColor','customText','snoozeUntil']);setDate(id,iso(new Date()));offerUndo('routines',id,pv2,'Marqué comme fait ✓')}
+    else if(a==='done-today'){var pv=snap('routines',id,['lastDone','hasPrev','prevDone','prevForce','prevCustom','forceColor','customText','snoozeUntil']);openId=null;calFor=null;setDate(id,iso(new Date()));renderSheet();offerUndo('routines',id,pv,'Marqué comme fait ✓')}
+    else if(a==='snooze'){var n=parseInt(b.getAttribute('data-n')||(function(){var i=document.querySelector('[data-snzn]');return i?i.value:''})(),10);
+      if(!(n>0&&n<=365)){toastMsg('Entre un nombre de jours');return}
+      var pvs=snap('routines',id,['snoozeUntil']),dd=new Date();dd.setDate(dd.getDate()+n);openId=null;calFor=null;upd('routines',id,{snoozeUntil:iso(dd)});renderSheet();offerUndo('routines',id,pvs,'En pause pour '+n+' jour'+(n>1?'s':'')+' 💤')}
+    else if(a==='snooze-clear'){var pvc=snap('routines',id,['snoozeUntil']);openId=null;calFor=null;upd('routines',id,{snoozeUntil:null});renderSheet();offerUndo('routines',id,pvc,'La tâche est de retour ✓')}
     else if(a==='undo'){openId=null;calFor=null;undoDate(id);renderSheet()}
     else if(a==='del'){var rg=(find('routines',id)||{}).group;openId=null;calFor=null;confirmDel=null;renderSheet();delUndo('routines',id,rg==='Plantes'?'Plante supprimée':rg==='Kimchi'?'Tâche de Kimchi supprimée':'Tâche maison supprimée')}
     else if(a==='wishq-toggle'){var fw=$('f-wish');fw.hidden=!fw.hidden;if(!fw.hidden)$('w-title').focus()}

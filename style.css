@@ -1168,3 +1168,17 @@ body[data-tab="home"] .hbtns{display:flex}
 .sc-txt{max-width:66%;padding-bottom:0}
 body[data-tab="home"][data-view="simple"] .sc-txt h2{font-size:17px}
 .sc-k{right:5%;bottom:12px;width:27%;max-width:112px}
+/* v78 : vue détaillée sur ordinateur, la météo ne touche plus les cartes */
+@media (min-width:900px) and (orientation:landscape){
+  body[data-tab="home"][data-view="detail"] .head{margin-bottom:14px}
+  body[data-tab="home"][data-view="detail"] .weather{margin-bottom:2px}
+}
+/* v78 : tâche en pause (masquée de « À faire » pendant X jours) */
+.snzbox{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:700;color:var(--ink2)}
+.snzbox b{color:var(--lav)}
+.snzchips{display:flex;flex-wrap:wrap;gap:8px}
+.snzc{border:0;border-radius:999px;padding:7px 14px;background:rgba(141,123,240,.12);color:var(--lav);font-weight:800;font-size:13px;cursor:pointer}
+.snzc:hover{background:rgba(141,123,240,.22)}
+.panel .snzgo{background:rgba(141,123,240,.12);color:var(--lav)}
+.row.snz{opacity:.78}
+.row .snzl,.ptile .pd{overflow-wrap:anywhere}

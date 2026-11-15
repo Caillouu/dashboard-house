@@ -122,6 +122,13 @@ def main():
                     assert state['routines'][0][4] != time.strftime('%Y-%m-%d'), 'le 2e tap devrait annuler'
                     page.click('#l-Kimchi .row .t'); page.wait_for_timeout(300)
                     assert page.is_visible('.sheet-card .bigdone'); page.click('.sheet-x'); page.wait_for_timeout(200)
+                    # mise en pause d'une tâche : elle quitte « À faire », puis revient avec Annuler
+                    page.click('#l-Maison .row .t'); page.wait_for_timeout(300)
+                    page.fill('[data-snzn]', '5'); page.click('.snzgo'); page.wait_for_timeout(800)
+                    assert 'snoozeUntil' in state['routines'][2][7], state['routines'][2]
+                    assert page.locator('#l-todoall .tarow').count() == 0, 'tâche en pause masquée de À faire'
+                    page.click('[data-act=undo-upd]'); page.wait_for_timeout(800)
+                    assert page.locator('#l-todoall .tarow').count() == 1, 'la pause annulée remet la tâche'
                 page.click('.tabbar [data-tab=courses]'); page.wait_for_timeout(300)
                 if name == 'mobile':
                     assert page.is_visible('#c-title'), 'le champ d\'ajout doit être visible dans l\'onglet Courses'
