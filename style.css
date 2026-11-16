@@ -1198,14 +1198,28 @@ body[data-tab="home"][data-view="simple"] .sc-txt h2{font-size:17px}
 
 /* v83 : courses en deux catégories (quotidien / exceptionnel) */
 .csec{display:flex;align-items:baseline;margin-top:10px}
-.csec:first-child{margin-top:0}
-.chint{font-size:12px;color:var(--ink2);opacity:.85;margin:4px 4px 2px}
-.addform{flex-wrap:wrap}
-.ccat{flex-basis:100%;display:flex;gap:6px}
+.cfil{display:flex;gap:6px;margin-bottom:8px}
 /* v83 : pause en un geste */
-.snzhint{margin:-2px 0 8px}
 .snzc.ghost{background:transparent;border:1.5px dashed rgba(141,123,240,.45)}
 /* v83 : jusqu'à 3 quêtes principales */
 .qhero .qcard+.qcard{margin-top:10px}
 .k2-mq+.k2-mq{margin-top:14px;padding-top:12px;border-top:1.5px solid rgba(141,123,240,.14)}
 #l-main .tq+.tq{margin-top:12px}
+
+/* v84 : la croix de fermeture s'aligne sur la première ligne de la fiche */
+.sheet-x{top:14px}
+.sheet-card:has(.panel>.ifield:first-child) .sheet-x{top:24px}
+/* v84 : fiche routine déjà faite aujourd'hui */
+.donetoday{width:100%;padding:10px 14px;font-size:14px}
+/* v84 : période d'une quête */
+.qdates .in{flex:none;width:auto;padding:4px 8px}
+/* v84 : sections de routines personnalisées */
+.cgroups{display:contents}
+body[data-tab="courses"] .cgroups,body[data-tab="voyage"] .cgroups{display:none}
+.gic{font-size:13px;display:flex;align-items:center;justify-content:center}
+.gedit{margin-right:6px}
+.addgrp{display:none;border:1.5px dashed rgba(141,123,240,.35);box-shadow:none;background:transparent;color:var(--lav);font:inherit;font-weight:800;font-size:14px;padding:16px;cursor:pointer;align-items:center;justify-content:center}
+body[data-tab="maison"] .addgrp{display:flex}
+/* v84 : valise par sections */
+.steps .pk-g{list-style:none;display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.qc-when{font-size:12px;font-weight:800;color:var(--ink2);margin:-2px 0 2px 2px}

@@ -122,6 +122,14 @@ def main():
                     assert state['routines'][0][4] != time.strftime('%Y-%m-%d'), 'le 2e tap devrait annuler'
                     page.click('#l-Kimchi .row .t'); page.wait_for_timeout(300)
                     assert page.is_visible('.sheet-card .bigdone'); page.click('.sheet-x'); page.wait_for_timeout(200)
+                    # déjà fait aujourd'hui : plus de gros bouton vert, un bouton discret qui annule
+                    page.click('#l-Kimchi [data-act=care-chk]'); page.wait_for_timeout(800)
+                    page.click('#l-Kimchi .row .t'); page.wait_for_timeout(300)
+                    assert not page.is_visible('.sheet-card .bigdone') and page.is_visible('.sheet-card .donetoday')
+                    page.click('.sheet-card .donetoday'); page.wait_for_timeout(800)
+                    assert state['routines'][0][4] != time.strftime('%Y-%m-%d'), 'le bouton « fait aujourd\'hui » annule'
+                    assert page.is_visible('.sheet-card .bigdone'), 'le gros bouton revient'
+                    page.click('.sheet-x'); page.wait_for_timeout(200)
                     # mise en pause d'une tâche : elle quitte « À faire », puis revient avec Annuler
                     page.click('#l-Maison .row .t'); page.wait_for_timeout(300)
                     page.click('.sheet-card .snzc >> text=1 semaine'); page.wait_for_timeout(800)
@@ -135,7 +143,7 @@ def main():
                     assert page.locator('.sheet-card [data-field=name]').count() == 1, "un seul champ de titre"
                     assert page.locator('.sheet-card .lab').all_inner_texts() == ['Rappel', 'Pause'], page.locator('.sheet-card .lab').all_inner_texts()
                     assert page.locator('.sheet-card .thr:not(.snzrow) [data-snzn]').count() == 0, 'la pause ne doit pas être dans Rappel'
-                    assert page.locator('.sheet-card .snzc').count() == 5, 'boutons rapides de pause'
+                    assert page.locator('.sheet-card .snzc').count() == 4, 'boutons rapides de pause'
                     page.click('.sheet-card [data-act=snz-other]'); page.wait_for_timeout(200)
                     page.fill('[data-snzn]', '5'); page.keyboard.press('Enter'); page.wait_for_timeout(600)
                     assert 'snoozeUntil' in state['routines'][2][7], 'Entrée dans le champ « Autre » valide la pause'
@@ -154,6 +162,24 @@ def main():
                     page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(300)
                     assert 'Vider le lave-vaisselle' in page.inner_text('#l-main') + page.inner_text('#hub3'), 'missions maison sur l\'accueil'
                     page.evaluate("(()=>{const b=document.createElement('button');b.dataset.act='tab';b.dataset.tab='maison';document.body.appendChild(b);b.click();b.remove()})()"); page.wait_for_timeout(300)
+                    # nouvelle section de routines : nom + icône, puis des tâches comme Kimchi / Maison
+                    page.click('[data-act=grp-new]'); page.wait_for_timeout(300)
+                    page.fill('.sheet-card [data-grp=name]', '🚲 Vélo'); page.click('.sheet-card [data-act=grp-save]'); page.wait_for_timeout(800)
+                    grow = [r for r in state['routines'] if r[1] == 'Vélo']
+                    assert grow and '"grp":1' in grow[0][7], state['routines']
+                    page.click('.cgrp [data-act=care-add]'); page.wait_for_timeout(200)
+                    page.fill('.cgrp form.care-add input', 'Gonfler les pneus'); page.keyboard.press('Enter'); page.wait_for_timeout(800)
+                    assert any(r[1] == 'Vélo' and r[3] == 'Gonfler les pneus' for r in state['routines']), state['routines']
+                    assert 'Gonfler les pneus' in page.inner_text('.cgrp'), 'la tâche s\'affiche dans sa section'
+                    page.click('.cgrp .row .t'); page.wait_for_timeout(300)
+                    page.fill('.sheet-card [data-field=everyN]', '7'); page.locator('.sheet-card [data-field=everyN]').dispatch_event('change'); page.wait_for_timeout(700)
+                    page.click('.sheet-x'); page.wait_for_timeout(400)
+                    assert 'Gonfler les pneus' in page.inner_text('#l-todoall'), 'avec un rappel, elle passe dans À faire'
+                    assert 'Vélo' in page.inner_text('#l-todoall'), 'le nom de la section s\'affiche'
+                    # renommer la section renomme ses tâches
+                    page.click('.cgrp [data-act=grp-edit]'); page.wait_for_timeout(300)
+                    page.fill('.sheet-card [data-grp=name]', 'Vélos'); page.click('.sheet-card [data-act=grp-save]'); page.wait_for_timeout(900)
+                    assert all(r[1] == 'Vélos' for r in state['routines'] if r[3] == 'Gonfler les pneus' or '"grp":1' in r[7]), state['routines']
                 page.click('.tabbar [data-tab=courses]'); page.wait_for_timeout(300)
                 if name == 'mobile':
                     assert page.is_visible('#c-title'), 'le champ d\'ajout doit être visible dans l\'onglet Courses'
@@ -175,15 +201,28 @@ def main():
                     assert not any(r[5] for r in state['courses']), 'le glisser ne doit pas cocher'
                     assert '"ord"' in [r for r in state['courses'] if r[2] == 'tomates'][0][6], state['courses']
                 if name == 'mobile':
-                    # deux catégories : un article ajouté avec ✨ atterrit dans « Exceptionnel »
+                    # glisser un article au-delà de l'en-tête « Exceptionnel » : il change de catégorie
                     assert page.locator('#l-courses .csec').count() == 2, 'en-têtes Quotidien / Exceptionnel'
-                    page.click('#f-course .ccat [data-v=exc]'); page.wait_for_timeout(100)
-                    page.fill('#c-title', 'liquide vaisselle'); page.keyboard.press('Enter'); page.wait_for_timeout(800)
-                    lv = [r for r in state['courses'] if r[2] == 'liquide vaisselle']
-                    assert lv and '"cat": "exc"' in lv[0][6].replace('":"', '": "'), state['courses']
+                    assert page.locator('#f-course .ccat').count() == 0, 'plus de sélecteur de catégorie à l\'ajout'
+                    rows = page.locator('#l-courses .crow:not(.done)')
+                    r2b = rows.nth(2).bounding_box()
+                    hdr = page.locator('#l-courses .csec[data-sec=exc]').bounding_box()
+                    y0 = r2b['y'] + r2b['height'] / 2; y1 = hdr['y'] + hdr['height'] + 12
+                    page.mouse.move(r2b['x'] + 60, y0); page.mouse.down(); page.wait_for_timeout(500)
+                    for k in range(1, 11):
+                        page.mouse.move(r2b['x'] + 60, y0 + (y1 - y0) * k / 10); page.wait_for_timeout(40)
+                    page.mouse.up(); page.wait_for_timeout(900)
+                    tom = [r for r in state['courses'] if r[2] == 'tomates'][0]
+                    assert '"cat":"exc"' in tom[6], tom
                     exc_rows = page.eval_on_selector_all('#l-courses .csec[data-sec=exc] ~ .crow:not(.done) .ct', 'e => e.map(x => x.textContent)')
-                    assert exc_rows == ['liquide vaisselle'], exc_rows
-                    page.click('#f-course .ccat [data-v=std]'); page.wait_for_timeout(100)
+                    assert exc_rows == ['tomates'], exc_rows
+                    # filtre d'affichage : l'une, l'autre, ou les deux
+                    page.click('#l-courses .cfil [data-v=exc]'); page.wait_for_timeout(300)
+                    assert page.eval_on_selector_all('#l-courses .crow:not(.done) .ct', 'e => e.map(x => x.textContent)') == ['tomates']
+                    page.click('#l-courses .cfil [data-v=std]'); page.wait_for_timeout(300)
+                    assert page.eval_on_selector_all('#l-courses .crow:not(.done) .ct', 'e => e.map(x => x.textContent)') == ['pain', 'lait']
+                    page.click('#l-courses .cfil [data-v=all]'); page.wait_for_timeout(300)
+                    assert page.locator('#l-courses .csec').count() == 2
                 page.screenshot(path=f'{OUT}/{name}-courses.png', full_page=True)
                 page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(300)
                 if name == 'mobile':
@@ -267,6 +306,27 @@ def main():
                         page.click(f'.qhero .qc-t >> text={t}'); page.wait_for_timeout(300)
                         page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(700)
                     assert sum(1 for r in state['projects'] if r[3] == 'oui') == 1, state['projects']
+                    # période : pas encore commencée -> badge, absente de l'accueil
+                    page.click('.qhero .qc-t >> text=Réparer robinet'); page.wait_for_timeout(300)
+                    page.fill('.sheet-card [data-field=qfrom]', _d(5)); page.locator('.sheet-card [data-field=qfrom]').dispatch_event('change'); page.wait_for_timeout(700)
+                    assert '"qfrom"' in state['projects'][0][5], state['projects'][0]
+                    page.click('.sheet-x'); page.wait_for_timeout(300)
+                    assert 'à partir du' in page.inner_text('.qhero'), 'badge « à partir du »'
+                    page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(400)
+                    assert page.locator('#l-main .tq:not(.tq-none)').count() == 0, 'pas encore commencée : pas sur l\'accueil'
+                    page.click('.h2btn'); page.wait_for_timeout(400)
+                    # période : terminée hier -> la quête est considérée comme faite
+                    page.click('.qhero .qc-t >> text=Réparer robinet'); page.wait_for_timeout(300)
+                    page.fill('.sheet-card [data-field=qfrom]', ''); page.locator('.sheet-card [data-field=qfrom]').dispatch_event('change'); page.wait_for_timeout(500)
+                    page.fill('.sheet-card [data-field=quntil]', _d(-1)); page.locator('.sheet-card [data-field=quntil]').dispatch_event('change'); page.wait_for_timeout(700)
+                    page.click('.sheet-x'); page.wait_for_timeout(400)
+                    assert page.locator('.qhero .qcard').count() == 0, 'la période passée sort la quête du héros'
+                    assert 'Terminées' in page.inner_text('#qt-list'), 'la quête passée est dans Terminées'
+                    page.click('#qt-list .donetog'); page.wait_for_timeout(400)
+                    page.click('#qt-list .qcard.done .qc-t >> text=Réparer robinet'); page.wait_for_timeout(300)
+                    page.fill('.sheet-card [data-field=quntil]', ''); page.locator('.sheet-card [data-field=quntil]').dispatch_event('change'); page.wait_for_timeout(700)
+                    page.click('.sheet-x'); page.wait_for_timeout(400)
+                    assert page.locator('.qhero .qcard').count() == 1, 'période effacée : la quête revient'
                 assert page.is_visible('.qhero'), 'onglet Quêtes'; page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(300)
                 # ---- Voyages ----
                 assert page.is_visible('#trip-next'), 'pas de compte à rebours sur l\'accueil'
@@ -314,9 +374,11 @@ def main():
                     page.click('[data-act=pack-fold]'); page.wait_for_timeout(1500)
                     tp = [r for r in state['voyages'] if r[2] == 'Valise' and r[1] == '']
                     assert len(tp) == 5, tp
+                    assert all('# ' in x[9] for x in tp), 'les listes types ont des titres de catégories'
                     page.click('[data-act=tpl-use] >> text=Camping'); page.wait_for_timeout(900)
                     pk = [r for r in state['voyages'] if r[1] == 'v1' and r[2] == 'Valise'][0]
-                    assert 'Tente' in pk[9], pk
+                    assert 'Tente' in pk[9] and '# ' in pk[9], pk
+                    assert page.locator('.vpack .pk-g').count() >= 3, 'titres de catégories dans la valise'
                     page.evaluate("document.getElementById('vview').scrollTop=99999"); page.wait_for_timeout(200)
                     page.screenshot(path=f'{OUT}/{name}-voyage-valise.png')
                     page.click('[data-act=tpl-from-pack]'); page.wait_for_timeout(300)
