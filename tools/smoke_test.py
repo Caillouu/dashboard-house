@@ -402,6 +402,26 @@ def main():
                     assert rome and rome[0][4] == _d(20) + ' 07:15', rome
                     page.screenshot(path=f'{OUT}/{name}-voyages-apres.png')
                 ctx.close()
+
+            # Sécurité : un lien #setup= ne doit pas rediriger l'app vers un autre script
+            # en gardant le code d'accès (il serait envoyé à ce script).
+            OTHER = 'https://script.google.com/macros/s/AKfycbAUTREautreAUTRE0987654321/exec'
+            ctx = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
+            page = ctx.new_page(); page.route('https://script.google.com/**', handle)
+            page.goto(f'http://localhost:{PORT}/#setup={FAKE_API}')
+            page.fill('#login-code', FAKE_CODE); page.click('#login-go'); page.wait_for_timeout(1200)
+            assert page.is_hidden('#login'), 'connexion initiale'
+            page.on('dialog', lambda d: d.dismiss())          # on refuse le changement
+            page.goto(f'http://localhost:{PORT}/#setup={OTHER}'); page.wait_for_timeout(1200)
+            assert page.evaluate("localStorage.getItem('maison-api')") == FAKE_API, 'refus : le script ne change pas'
+            assert page.evaluate("localStorage.getItem('maison-key')") == FAKE_CODE, 'refus : la session est gardée'
+            page2 = ctx.new_page(); page2.route('https://script.google.com/**', handle)
+            page2.on('dialog', lambda d: d.accept())          # on accepte le changement
+            page2.goto(f'http://localhost:{PORT}/#setup={OTHER}'); page2.wait_for_timeout(1200)
+            assert page2.evaluate("localStorage.getItem('maison-api')") == OTHER, 'accepté : le script change'
+            assert page2.evaluate("localStorage.getItem('maison-key')") is None, 'accepté : le code est effacé, jamais envoyé au nouveau script'
+            assert page2.is_visible('#login'), 'accepté : le code est redemandé'
+            ctx.close()
             browser.close()
     finally:
         srv.terminate()

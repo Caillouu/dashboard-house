@@ -3,7 +3,10 @@
    du Sheet, avec un code d'accès. Aucun identifiant (Sheet, agenda, code) n'est écrit dans ce fichier. */
 (function(){
   'use strict';
-  var COL={projects:'projects',routines:'routines',shop:'shopping'};
+  /* Jamais affichée à l'intérieur d'un autre site : GitHub Pages ne permet pas d'envoyer
+     l'en-tête frame-ancestors, donc on refuse ici (un site piège pourrait sinon faire
+     cliquer sur des boutons de l'app à l'insu de la personne). */
+  if(window.top!==window.self){document.documentElement.textContent='Cette application ne peut pas s\'afficher à l\'intérieur d\'un autre site.';return}
   var S={projects:[],routines:[],shop:[],courses:[],voyages:[]};
   var GROUPS=['Kimchi','Plantes','Maison'];
   var PRIO={high:'Urgent',med:'Pas urgent',low:'Idée'}, PW={high:3,med:2,low:1}, PEMO={high:'🔥',med:'⏳',low:'💡'};
@@ -39,8 +42,15 @@
   (function(){ /* lien d'installation : …/#setup=<adresse du script> (le # n'est jamais envoyé à un serveur) */
     var m=location.hash.match(/^#setup=(.+)$/);
     if(m){var u=normApi(m[1]);
-      if(API_RE.test(u)){API=u;lsSet(LS_API,u)}
-      try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
+      try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+      if(!API_RE.test(u))return;
+      if(API&&u!==API){
+        /* changer de script en gardant le code reviendrait à l'envoyer à ce nouveau script :
+           on demande confirmation et on redemande le code dans tous les cas */
+        if(!confirm('Ce lien veut connecter l\'application à un AUTRE script que celui enregistré.\n\nN\'accepte que si tu viens de créer ce lien toi-même. Le code d\'accès sera redemandé.'))return;
+        KEY=null;lsSet(LS_KEY,null);lsSet(CK,null);
+      }
+      API=u;lsSet(LS_API,u)}
   })();
 
   function AuthError(code){this.code=code}
@@ -416,51 +426,7 @@
   function mains3(){return S.projects.filter(function(p){return p.main&&p.status!=='done'&&qStarted(p)&&!qExpired(p)}).slice(0,3)}
   function dueList(){var R={r:0,o:1};return S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue).sort(function(a,b){return R[a.st.c]-R[b.st.c]})}
   /* Kimchi réagit au moment, à la météo et au voyage — pas aux choses à faire (elles sont juste en dessous) */
-  function kimchiSays(due,nt,ts){var h=new Date().getHours(),hi=h<6?'Bonne nuit':h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir',c=W&&W.cond,day=W?W.isDay!==false:h>=8&&h<18,t;
-    if(nt&&ts.k==='now')t='Profitez bien de '+nt.title+' 🌴';
-    else if(nt&&ts.k==='soon'&&ts.n<=7)t=ts.n<=1?'Demain, direction '+nt.title+' ! 🧳':'Plus que '+ts.n+' dodos avant '+nt.title+' 🧳';
-    else if(c==='rain'||c==='storm')t='Il pleut, parfait pour une quête au chaud ☔';
-    else if(c==='snow')t='Il neige ! Kimchi veut absolument sortir ❄️';
-    else if((c==='clear'||c==='partly')&&day&&h>=9&&h<19)t='Beau temps, Kimchi est de bonne humeur ☀️';
-    else if(h>=21||h<6)t=due.length?'Soirée tranquille, le reste attendra demain 🌙':'Tout est fait, Kimchi s\'endort 😴';
-    else if(h>=18)t='Soirée tranquille à la maison 🛋️';
-    else if(h<12)t='Belle journée à la maison 🐾';
-    else t='Kimchi fait la sieste, profitez-en 🐾';
-    return {hi:hi,t:t}}
   /* Vue simple : une carte « Aujourd'hui » (prochainement, à faire, quête principale, vacances) + 6 raccourcis */
-  function renderHub2(){var el=$('hub2');if(!el||TAB!=='home'||VIEW!=='simple')return;
-    var due=dueList(),nt=nextTrip(),ts=nt&&tripState(nt),k=kimchiSays(due,nt,ts),h='',now=new Date();
-    h+='<div class="k2-top"><img class="k2" id="k2" src="assets/kimchi-anim.svg" alt=""><div class="k2-hi">'+esc(k.t)+'</div></div>';
-    /* Prochainement : le prochain événement de l'agenda */
-    var evs=cal.status==='ok'?cal.events.filter(function(x){return x&&HID.indexOf(x.id)<0}).map(function(x){return {e:x,i:evInfo(x)}}).filter(function(x){return x.i&&x.i.n>=0}):[];
-    var e=evs.filter(function(x){return x.i.n>0||x.i.allDay||x.i.d>now})[0];
-    if(e)h+='<div class="k2-part"><div class="k2-lab">Prochainement</div><button class="k2-ev" data-act="hub-go" data-v="agenda"><span class="k2-evd"><b>'+e.i.d.getDate()+'</b>'+esc(e.i.d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</span><span class="k2-evm"><span class="k2-evt">'+esc(EVN[e.e.id]||e.e.summary||'Événement')+'</span><span class="k2-evs">'+esc(cap(e.i.n===0?"aujourd'hui":e.i.n===1?'demain':e.i.d.toLocaleDateString('fr-FR',{weekday:'long'})))+(e.i.allDay?'':' · '+e.i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))+'</span></span></button></div>';
-    /* À faire : 3 au maximum */
-    if(due.length)h+='<div class="k2-part"><div class="k2-lab">À faire</div><div class="k2-pills">'+due.slice(0,3).map(function(x){var r=x.r;return '<span class="k2-pill">'+careChk(r)+'<button class="k2-pt" data-act="care-open" data-id="'+esc(r.id)+'">'+(r.emoji?esc(r.emoji)+' ':'')+esc(r.title)+'</button></span>'}).join('')+
-      (due.length>3?'<button class="k2-more" data-act="hub-go" data-v="todo">+'+(due.length-3)+' autre'+(due.length>4?'s':'')+'</button>':'')+'</div></div>';
-    /* Quêtes principales (jusqu'à 3) : toute la checklist */
-    var MQ=mains3();
-    if(MQ.length){h+='<div class="k2-part"><div class="k2-lab">📌 Quête'+(MQ.length>1?'s':'')+' principale'+(MQ.length>1?'s':'')+'</div>'+MQ.map(function(m){var ss=m.steps||[],dn=ss.filter(function(x){return x.done}).length,id=esc(m.id);
-      return '<div class="k2-mq"><button class="k2-q" data-act="proj-open" data-id="'+id+'"><span>'+esc((m.emoji?m.emoji+' ':'')+m.title)+'</span>'+(ss.length?'<i>'+dn+'/'+ss.length+'</i>':'')+'</button>'+
-        (ss.length?'<div class="bar k2-bar"><i style="width:'+Math.round(dn/ss.length*100)+'%"></i></div><ul class="tq-steps">'+ss.map(function(x,i){return '<li class="tq-step'+(x.done?' done':'')+'"><button class="chk" data-act="ps" data-id="'+id+'" data-i="'+i+'" aria-label="'+(x.done?'Décocher : ':'Terminer : ')+esc(x.t)+'">'+CHECK+'</button><button class="tq-st" data-act="proj-open" data-id="'+id+'">'+esc(x.t)+'</button></li>'}).join('')+'</ul>'
-          :'<button class="k2-st" data-act="proj-open" data-id="'+id+'">+ Ajoute une première mini-quête</button>')+
-        (ss.length&&dn===ss.length?'<div class="tq-row"><span class="tq-win">Quête accomplie 🎉</span><button class="btn tq-next" data-act="main-finish" data-id="'+id+'">Choisir la suivante</button></div>':'')+'</div>'}).join('')+'</div>'}
-    /* Les prochaines vacances (compte à rebours compact) */
-    if(nt){var da=departAt(nt),cd='';
-      if(ts.k==='now')cd='<span class="k2-now">🌴 En vacances · jour '+ts.day+' sur '+ts.tot+'</span>';
-      else if(ts.k==='soon'&&ts.n===0)cd='<span class="k2-now">🎉 C\'est aujourd\'hui !</span>';
-      else if(da)cd='<span class="flap" role="timer" data-cd="'+da.d.getTime()+'">'+flapInner(da.d-Date.now())+'</span>';
-      h+='<div class="k2-part"><button class="k2-trip" data-act="hub-go" data-v="voyage"><span class="k2-tl">'+esc(tEmo(nt)+' '+nt.title)+(ts.k==='soon'?' dans':'')+'</span>'+cd+'</button></div>'}
-    /* Raccourcis : un seul badge (À faire) ; les autres ont juste une petite info */
-    var week=evs.filter(function(x){return x.i.n<=7}).length,nw=S.shop.filter(function(w){return !w.done}).length,nq=S.projects.filter(function(p){return p.status!=='done'}).length;
-    var dock=function(v,em,lab,sub,badge){return '<button class="dk" data-act="hub-go" data-v="'+v+'"><span class="dk-ic">'+em+(badge?'<b>'+badge+'</b>':'')+'</span><span class="dk-l">'+lab+'</span></button>'};
-    el.innerHTML='<section class="k2-card">'+h+'</section><nav class="k2-dock" aria-label="Raccourcis">'+
-      dock('courses','🛒','Courses','Ma liste','')+
-      dock('agenda','📅','Agenda',week?week+' cette semaine':'Semaine calme','')+
-      dock('todo','🧹','À faire',due.length?'':'Tout est à jour',due.length||'')+
-      dock('voyage','🧳','Voyages',nt?esc(nt.title):'Rien de prévu','')+
-      dock('quetes','🗺️','Quêtes',nq?nq+' en cours':'Une idée ?','')+
-      dock('wish','🎁','Envies',nw?nw+' envie'+(nw>1?'s':''):'Rien pour l\'instant','')+'</nav>'}
   /* ---- Onglet Test : accueil « scène » — Kimchi dans un décor qui suit l'heure et la météo, une jauge arc-en-ciel, puis 4 lignes ---- */
   function sceneMood(){var h=new Date().getHours(),c=W&&W.cond,night=W?W.isDay===false:(h>=20||h<7);
     if(c==='rain'||c==='storm')return night?'night rain':'rain';if(c==='snow')return 'snow';
@@ -651,13 +617,6 @@
   }
 
   /* Page dédiée aux quêtes (plein écran) */
-  var qOpen=false,qShowDone=false;
-  function qview(open,push){
-    qOpen=open;var el=$('qview');el.hidden=!open;document.documentElement.classList.toggle('q-open',open);
-    if(push){try{if(open)history.pushState({q:1},'','#quetes');else if(history.state&&history.state.q)history.back();else history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
-    if(open){renderQView();el.scrollTop=0;var b=el.querySelector('.qv-back');if(b)b.focus({preventScroll:true})}
-  }
-  window.addEventListener('popstate',function(){var want=location.hash==='#quetes';if(want!==qOpen)qview(want,false)});
   function qCard(o){
     var ss=o.steps||[],done=ss.filter(function(x){return x.done}).length,pc=ss.length?Math.round(done/ss.length*100):0,id=esc(o.id);
     var fin=o.status==='done'||(ss.length&&done===ss.length)||qExpired(o),p=PRIO[o.prio]?o.prio:'med',st=o.status||'todo';
@@ -702,17 +661,6 @@
       '<div class="qt-sec">Quêtes secondaires'+(all.length?' <i>'+all.length+'</i>':'')+'</div>'+chips+
       (act.length?'<div class="qv-list">'+act.map(qCard).join('')+'</div>':'<p class="empty">'+emptyTxt+'</p>')+
       (fin.length?'<button type="button" class="lnk donetog" data-act="qt-done" aria-expanded="'+qtDone+'">'+(qtDone?'▾':'▸')+' Terminées ('+fin.length+')</button>'+(qtDone?'<div class="qv-list">'+fin.map(qCard).join('')+'</div>':''):'')}
-  function renderQView(){
-    if(!qOpen)return;var L=$('qv-list');if(!L)return;
-    var ae=document.activeElement;if(ae&&L.contains(ae)&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&ae.value)return;
-    if(ae&&ae.matches&&ae.matches('#qv-list select.pr'))return;
-    var isFin=function(o){var ss=o.steps||[];return o.status==='done'||qExpired(o)||(ss.length&&ss.every(function(x){return x.done}))};
-    var srt=function(a,b){if(!!a.main!==!!b.main)return a.main?-1:1;var sa=a.status==='doing'?0:1,sb=b.status==='doing'?0:1;if(sa!==sb)return sa-sb;var q=(PW[b.prio]||2)-(PW[a.prio]||2);if(q)return q;return (a.createdAt||0)-(b.createdAt||0)};
-    var act=S.projects.filter(function(o){return !isFin(o)}).sort(srt),fin=S.projects.filter(isFin).sort(srt);
-    $('qv-count').textContent=act.length?act.length+' en cours ou à faire':'';
-    L.innerHTML=(act.length?act.map(qCard).join(''):'<p class="empty">'+(loaded.projects?'Aucune quête en cours. Ajoute-en une !':'Chargement…')+'</p>')+
-      (fin.length?'<button type="button" class="lnk donetog" data-act="qdone-tog" aria-expanded="'+qShowDone+'">'+(qShowDone?'▾':'▸')+' Terminées ('+fin.length+')</button>'+(qShowDone?fin.map(qCard).join(''):''):'');
-  }
 
   /* ---- Courses ---- */
   function parseCourse(v){ /* « 2 lait », « lait x2 », « 🥛 lait 1L » */
@@ -878,11 +826,7 @@
      sur place, hébergements, activités et sa valise (une seule ligne, un objet par ligne de texte).
      Pas de fichier : un billet = une référence + un lien (le script n'a volontairement pas accès à Drive). */
   var VT={voyage:'Voyage',trajet:'Trajet',transport:'Transport sur place',logement:'Hébergement',activite:'Activité',valise:'Valise'};
-  var TMODE={avion:['✈️','Avion'],train:['🚆','Train'],bus:['🚌','Bus'],voiture:['🚗','Voiture'],bateau:['⛴️','Bateau']};
-  var LMODE={location:['🚗','Location'],taxi:['🚕','Taxi'],metro:['🚇','Métro, bus'],navette:['🚐','Navette'],velo:['🚲','Vélo']};
   var TRIPEMO=['🚆','🏖️','🏔️','🏙️','🏝️','🎿','⛺','🌍','🗺️','🏰','🌴','❄️','🎒','🚗','🍷'];
-  var AEMO=['📍','🏛️','🍽️','🎢','🏖️','🥾','🎭','🛍️','🍷','🚤','🎨','📸','⛷️','🧖','🎟️','🌅'];
-  var PACK_TPL=['🪪 Papiers d\'identité','🎫 Billets et réservations','💳 Carte bancaire','📱 Chargeur de téléphone','🔋 Batterie externe','🔌 Adaptateur de prise','💊 Médicaments','🪥 Brosse à dents et dentifrice','🧴 Trousse de toilette','😴 Pyjama','🩲 Sous-vêtements','🧦 Chaussettes','👕 Hauts','👖 Bas','🧥 Veste','👟 Chaussures','🕶️ Lunettes de soleil','🎧 Écouteurs','🔑 Clés de la maison','🐕 Garde de Kimchi organisée'];
   var V_OLD=false,showPast=false,vOpen=null,tEdit=null,lastMulti=null;
   var vtWhen=null,vtFocus=false,vEmoOpen=false,vPackOpen=false,vDelConfirm=false;
   function vType(v){var n=nrm(v);if(!n)return '';
@@ -895,8 +839,6 @@
   function hPart(s){var m=String(s||'').match(/\s(\d{2}:\d{2})$/);return m?m[1]:''}
   function fmtDay(ds,o){return parse(ds).toLocaleDateString('fr-FR',o||{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'')}
   function relDay(ds){var n=diff(ds);return n===0?"aujourd'hui":n===1?'demain':fmtDay(ds)}
-  function fmtWhen(s){if(!s)return '';var h=hPart(s);return cap(fmtDay(dPart(s)))+(h?' · '+h:'')}
-  function fmtEur(n){return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2})+' €'}
   function mapsUrl(q){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q)}
   /* Icône d'un voyage : le train par défaut (l'ancien avion par défaut devient un train) */
   function tEmo(t){return !t.emoji||t.emoji==='✈️'?'🚆':t.emoji}
@@ -904,8 +846,6 @@
   function kids(tid,type){return S.voyages.filter(function(x){return x.trip===tid&&x.type!=='voyage'&&(!type||x.type===type)})}
   function byStart(a,b){var sk=function(v){return !v?'9999':v.length===10?v+' 99:99':v},x=sk(a.start),y=sk(b.start);if(x!==y)return x<y?-1:1;return (a.createdAt||0)-(b.createdAt||0)}
   function vEmoji(o){
-    if(o.type==='trajet')return (TMODE[o.mode]||TMODE.avion)[0];
-    if(o.type==='transport')return (LMODE[o.mode]||LMODE.location)[0];
     if(o.type==='logement')return '🛏️';if(o.type==='valise')return '🧳';
     return o.emoji||(o.type==='activite'?'📍':'🚆')}
   function tripSpan(t){var s=dPart(t.start),e=dPart(t.end),ds=[];
@@ -1316,7 +1256,7 @@
     var b=$('banner');if(!b)return;
     if(fromCache){var d=new Date(fromCache);b.innerHTML='<div class="note">Dernières données · '+esc(d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))+'</div>'}
   }
-  function render(){var ae0=document.activeElement;if(ae0&&ae0.hasAttribute&&ae0.hasAttribute('data-stepedit'))return;renderCare();renderTodoAll();renderHub();renderQTab();renderAgenda();renderTodo();renderMain();renderShop();renderCourses();renderQView();renderTrips();renderTripNext();renderVView();renderSheet(true);cacheSave()}
+  function render(){var ae0=document.activeElement;if(ae0&&ae0.hasAttribute&&ae0.hasAttribute('data-stepedit'))return;renderCare();renderTodoAll();renderHub();renderQTab();renderAgenda();renderTodo();renderMain();renderShop();renderCourses();renderTrips();renderTripNext();renderVView();renderSheet(true);cacheSave()}
 
   function clock(){var n=new Date();$('hello').textContent=n.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});$('today').textContent=n.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}
   clock();setInterval(clock,15000);
@@ -1418,9 +1358,6 @@
     else if(a==='qt-done'){qtDone=!qtDone;renderQTab()}
     else if(a==='qt-cat'){qtCat=b.getAttribute('data-v');if(qtCat!=='all'&&!QCATL[qtCat])qtCat='all';try{localStorage.setItem('maison-qcat',qtCat)}catch(e){}renderQTab()}
     else if(a==='qadd3-toggle'){var q3=$('f-qadd3');q3.hidden=!q3.hidden;if(!q3.hidden)$('q-title3').focus()}
-    else if(a==='qview-close'){qview(false,true)}
-    else if(a==='qdone-tog'){qShowDone=!qShowDone;renderQView()}
-    else if(a==='qadd-toggle'){var qf=$('f-qadd');qf.hidden=!qf.hidden;if(!qf.hidden)$('q-title').focus()}
     else if(a==='add-toggle'){var fa=$('f-add');fa.hidden=!fa.hidden;if(!fa.hidden)$('a-title').focus()}
     else if(a==='sd'){it=find('projects',id);if(it){var i2=Number(b.getAttribute('data-i'));var st2=steps(it);st2.splice(i2,1);upd('projects',id,{steps:st2})}}
     else if(a==='cal-go'){load()}
@@ -1475,10 +1412,6 @@
       var pi2=document.querySelector('#vv-body [data-packinput]');if(pi2)pi2.focus();return;
     }
     if(f.id==='f-qadd3'){var q3t=$('q-title3'),q3s=splitEmoji(q3t.value);if(!q3s.title&&!q3s.emoji)return;var np=newProj(q3s);if(QCATL[qtCat])np.cat=qtCat;addDoc('projects',np);q3t.value='';f.hidden=true;return}
-    if(f.id==='f-qadd'){
-      var qt=$('q-title'),sq0=splitEmoji(qt.value);if(!sq0.title&&!sq0.emoji)return;
-      addDoc('projects',newProj(sq0));qt.value='';f.hidden=true;return;
-    }
     if(f.id==='f-add'){
       var ti=$('a-title'),sp0=splitEmoji(ti.value);if(!sp0.title&&!sp0.emoji)return;
       addDoc('projects',newProj(sp0));
@@ -1539,7 +1472,6 @@
   document.addEventListener('keydown',function(e){
     var t=e.target;
     if(e.key==='Escape'&&(openId||projId||wishOpen||evEdit||tEdit||tplMgr||tplEdit||bilPop||agOpen)){tEdit=null;tplMgr=false;tplEdit=null;bilPop=null;agOpen=false;evEdit=null;wishOpen=null;projId=null;openId=null;calFor=null;confirmDel=null;renderSheet();return}
-    if(e.key==='Escape'&&qOpen){qview(false,true);return}
     if(e.key==='Escape'&&cOpen){cview(false,true);return}
     if(e.key==='Escape'&&vOpen){vview(null,true);return}
     if((e.key==='Enter'||e.key===' ')&&t&&t.matches&&t.matches('[data-act="care-open"],[data-act="proj-open"],[data-act="ev-edit"],[data-act="v-item"]')){e.preventDefault();t.click()}

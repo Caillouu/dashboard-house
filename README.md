@@ -46,7 +46,7 @@ Pourquoi ce montage :
   - **Courses** : la liste de courses et la wishlist ;
   - **Voyages** : la liste des voyages à venir, puis les voyages passés.
 - **Quête principale** : la quête épinglée, avec ses mini-quêtes (étapes) à cocher.
-- **Quêtes secondaires** : un résumé sur l'accueil. Un clic sur le titre ouvre une **page plein écran** (`#quetes`) avec toutes les quêtes en détail : statut, urgence, mini-quêtes, notes et liens. Sous « Quêtes secondaires », des **filtres par catégorie** (Toutes, 💕 Date, 🏠 Maison, 📋 À faire, 🎨 Activités ; dernier filtre retenu sur l'appareil). La catégorie se choisit dans la fiche de la quête (champ `cat` dans la colonne technique) ; sans choix, elle est devinée d'après le titre (`QCAT_RX`, Activités par défaut). Une quête créée avec un filtre actif prend cette catégorie.
+- **Quêtes secondaires** : sous les quêtes principales dans l'onglet Quêtes, avec statut, urgence, mini-quêtes et notes. Filtres par catégorie (Date, Maison, À faire, Activités).
 - **Routines** :
   - chaque tâche a une fréquence (tous les N jours ou semaines) ;
   - la couleur passe au vert, à l'orange puis au rouge selon le temps écoulé depuis la dernière fois ;
@@ -113,10 +113,10 @@ Organisation de `app.js`, de haut en bas :
 1. **Connexion** : `api()`, l'écran de connexion et le lien `#setup=`.
 2. **Conversion lignes ↔ objets** : `SHT`, `fromRow()`, `toRow()`.
 3. **Chargement et écritures** : `load()`, `applyLoad()`, `queue()`, `shWrite()`, `shDel()`, `upd()`, `addDoc()`.
-4. **Rendu de chaque carte** : `renderCare`, `renderTodo`, `renderMain`, `renderShop`, `renderCourses`, `renderCal`, `renderWeather`, `renderQView`.
+4. **Rendu de chaque carte** : `renderCare`, `renderTodo`, `renderMain`, `renderShop`, `renderCourses`, `renderCal`, `renderWeather`, `renderQTab`.
    Voyages : `renderTrips` (liste), `renderTripNext` (accueil), `renderVView` (page d'un voyage), `tPanel`/`tSave` (fiche d'édition), `vClick` (clics).
 5. **Fenêtres de détail** : `renderSheet` (routine, quête, envie, renommage d'événement).
-6. **Onglets** (`setTab`) et **page des quêtes** (`qview`).
+6. **Onglets** (`setTab`) et pages plein écran (`cview` pour les courses, `vview` pour un voyage).
 7. **Gestion des clics** : un seul écouteur, basé sur les attributs `data-act`.
 
 ## 5. Modèle de données (Google Sheet)
@@ -174,6 +174,8 @@ Ces règles ont été fixées par le propriétaire du projet. **Toute modificati
 - **Aucun identifiant dans le code ni dans la documentation** : ni identifiant du Sheet, ni identifiant d'agenda, ni adresse ou identifiant de déploiement du script, ni code d'accès, ni adresse e-mail, ni prénom.
 - **Aucun script ou service tiers** dans la page. Les polices sont hébergées localement. La Content-Security-Policy de `index.html` n'autorise que le site lui-même et `script.google.com` / `script.googleusercontent.com`.
 - Tout texte affiché passe par `esc()`. Les liens passent par `safeUrl()` et s'ouvrent avec `rel="noopener noreferrer"`.
+- **Lien d'installation (`#setup=`)** : il n'accepte qu'une adresse `https://script.google.com/macros/s/…/exec`. S'il désigne un script **différent** de celui déjà enregistré, l'app demande confirmation **et efface le code d'accès** : sans cela, un lien piégé ferait envoyer le code au script de l'attaquant.
+- **Pas d'affichage dans un autre site** : GitHub Pages ne permet pas d'envoyer l'en-tête `frame-ancestors`, donc `app.js` refuse de s'exécuter dans un cadre (protection contre le détournement de clic).
 - L'authentification à deux facteurs doit rester activée sur GitHub et sur Google : quelqu'un qui contrôlerait ce dépôt pourrait modifier l'app pour intercepter le code d'accès.
 
 ## 8. Installer depuis zéro
