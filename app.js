@@ -292,10 +292,14 @@
       (r.emoji?'<span class="em" aria-hidden="true">'+esc(r.emoji)+'</span>':'<span class="dot"></span>')+
       '<div class="main"><span class="t">'+esc(r.title)+'</span><span class="sub">'+esc(st.txt)+'</span>'+(st.snz?'<span class="sub snzl">💤 En pause jusqu\'au '+snzDate(r)+'</span>':'')+'</div></div>';
   }
+  var snzOther=false; /* champ « Autre… » de la pause ouvert ? */
   function snoozeHtml(r){
     var id=esc(r.id);
     if(snoozed(r))return '<div class="lab">Pause</div><div class="snzon"><span>💤 En pause jusqu\'au <b>'+snzDate(r)+'</b></span><button type="button" class="btn snzgo" data-act="snooze-clear" data-id="'+id+'">Reprendre</button></div>';
-    return '<div class="lab">Pause</div><div class="thr snzrow">Mettre en pause pour <input class="in" type="number" min="1" max="365" inputmode="numeric" data-snzn value="7" aria-label="Nombre de jours de pause"> jours <button type="button" class="btn snzgo" data-act="snooze" data-id="'+id+'">OK</button></div>';
+    return '<div class="lab">Pause</div><div class="hint snzhint">La tâche se met de côté et revient toute seule.</div><div class="snzchips">'+
+      [[3,'3 jours'],[7,'1 semaine'],[14,'2 semaines'],[30,'1 mois']].map(function(x){return '<button type="button" class="snzc" data-act="snooze" data-n="'+x[0]+'" data-id="'+id+'">💤 '+x[1]+'</button>'}).join('')+
+      '<button type="button" class="snzc ghost" data-act="snz-other" data-id="'+id+'" aria-expanded="'+snzOther+'">Autre…</button></div>'+
+      (snzOther?'<div class="thr snzrow">Pendant <input class="in" type="number" min="1" max="365" inputmode="numeric" data-snzn value="10" aria-label="Nombre de jours de pause"> jours <button type="button" class="btn snzgo" data-act="snooze" data-id="'+id+'">OK</button></div>':'');
   }
   function panelHtml(r){
     var st=careState(r),un=r.everyUnit==='sem'?'sem':'j';
@@ -368,6 +372,8 @@
       '<div class="prow"><button class="lnk" data-act="ag-detail">Voir la vue détaillée</button><a class="btn ghost" href="https://calendar.google.com/calendar/u/0/r/week" target="_blank" rel="noopener noreferrer" data-close>Google Agenda ↗</a></div></div>'}
   function renderHub(){renderHub3()}
   /* ---- Onglet « Test » : vue simple v2 — une grande carte « Aujourd'hui » (quête, 3 choses, vacances) + un dock de raccourcis ---- */
+  /* Les quêtes principales (3 au maximum) */
+  function mains3(){return S.projects.filter(function(p){return p.main&&p.status!=='done'}).slice(0,3)}
   function dueList(){var R={r:0,o:1};return S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue).sort(function(a,b){return R[a.st.c]-R[b.st.c]})}
   /* Kimchi réagit au moment, à la météo et au voyage — pas aux choses à faire (elles sont juste en dessous) */
   function kimchiSays(due,nt,ts){var h=new Date().getHours(),hi=h<6?'Bonne nuit':h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir',c=W&&W.cond,day=W?W.isDay!==false:h>=8&&h<18,t;
@@ -392,13 +398,13 @@
     /* À faire : 3 au maximum */
     if(due.length)h+='<div class="k2-part"><div class="k2-lab">À faire</div><div class="k2-pills">'+due.slice(0,3).map(function(x){var r=x.r;return '<span class="k2-pill">'+careChk(r)+'<button class="k2-pt" data-act="care-open" data-id="'+esc(r.id)+'">'+(r.emoji?esc(r.emoji)+' ':'')+esc(r.title)+'</button></span>'}).join('')+
       (due.length>3?'<button class="k2-more" data-act="hub-go" data-v="todo">+'+(due.length-3)+' autre'+(due.length>4?'s':'')+'</button>':'')+'</div></div>';
-    /* Quête principale : toute la checklist */
-    var m=S.projects.filter(function(p){return p.main&&p.status!=='done'})[0];
-    if(m){var ss=m.steps||[],dn=ss.filter(function(x){return x.done}).length,id=esc(m.id);
-      h+='<div class="k2-part"><div class="k2-lab">📌 Quête principale</div><button class="k2-q" data-act="proj-open" data-id="'+id+'"><span>'+esc((m.emoji?m.emoji+' ':'')+m.title)+'</span>'+(ss.length?'<i>'+dn+'/'+ss.length+'</i>':'')+'</button>'+
+    /* Quêtes principales (jusqu'à 3) : toute la checklist */
+    var MQ=mains3();
+    if(MQ.length){h+='<div class="k2-part"><div class="k2-lab">📌 Quête'+(MQ.length>1?'s':'')+' principale'+(MQ.length>1?'s':'')+'</div>'+MQ.map(function(m){var ss=m.steps||[],dn=ss.filter(function(x){return x.done}).length,id=esc(m.id);
+      return '<div class="k2-mq"><button class="k2-q" data-act="proj-open" data-id="'+id+'"><span>'+esc((m.emoji?m.emoji+' ':'')+m.title)+'</span>'+(ss.length?'<i>'+dn+'/'+ss.length+'</i>':'')+'</button>'+
         (ss.length?'<div class="bar k2-bar"><i style="width:'+Math.round(dn/ss.length*100)+'%"></i></div><ul class="tq-steps">'+ss.map(function(x,i){return '<li class="tq-step'+(x.done?' done':'')+'"><button class="chk" data-act="ps" data-id="'+id+'" data-i="'+i+'" aria-label="'+(x.done?'Décocher : ':'Terminer : ')+esc(x.t)+'">'+CHECK+'</button><button class="tq-st" data-act="proj-open" data-id="'+id+'">'+esc(x.t)+'</button></li>'}).join('')+'</ul>'
           :'<button class="k2-st" data-act="proj-open" data-id="'+id+'">+ Ajoute une première mini-quête</button>')+
-        (ss.length&&dn===ss.length?'<div class="tq-row"><span class="tq-win">Quête accomplie 🎉</span><button class="btn tq-next" data-act="main-finish" data-id="'+id+'">Choisir la suivante</button></div>':'')+'</div>'}
+        (ss.length&&dn===ss.length?'<div class="tq-row"><span class="tq-win">Quête accomplie 🎉</span><button class="btn tq-next" data-act="main-finish" data-id="'+id+'">Choisir la suivante</button></div>':'')+'</div>'}).join('')+'</div>'}
     /* Les prochaines vacances (compte à rebours compact) */
     if(nt){var da=departAt(nt),cd='';
       if(ts.k==='now')cd='<span class="k2-now">🌴 En vacances · jour '+ts.day+' sur '+ts.tot+'</span>';
@@ -439,10 +445,9 @@
     var h='<section class="scene '+mood+'">'+sceneDeco(mood)+wx+'<div class="sc-txt"><h2>'+esc(title)+'</h2></div><img class="sc-k" src="assets/kimchi-anim.svg" alt="Kimchi"></section>';
     /* En ce moment : prochain événement, missions maison, quête principale, voyage */
     var rows='';
-    var m=S.projects.filter(function(p){return p.main&&p.status!=='done'})[0];
-    if(m){var ss=m.steps||[],dn=ss.filter(function(x){return x.done}).length,id=esc(m.id);
+    mains3().forEach(function(m){var ss=m.steps||[],dn=ss.filter(function(x){return x.done}).length,id=esc(m.id);
       rows+='<div class="sc-card"><button class="sc-row in" data-act="hub-go" data-v="quetes"><span class="sc-ic">📌</span><span class="sc-m"><span class="sc-t">'+esc(m.title)+'</span><span class="sc-s">Quête principale'+(ss.length?' · '+dn+'/'+ss.length:'')+'</span>'+(ss.length?'<span class="sc-bar"><i style="width:'+Math.round(dn/ss.length*100)+'%"></i></span>':'')+'</span><span class="sc-go" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span></button>'+
-        (ss.length?'<ul class="sc-list">'+ss.map(function(x,i){return '<li class="tq-step'+(x.done?' done':'')+'"><button class="chk" data-act="ps" data-id="'+id+'" data-i="'+i+'" aria-label="'+(x.done?'Décocher : ':'Terminer : ')+esc(x.t)+'">'+CHECK+'</button><button class="tq-st" data-act="proj-open" data-id="'+id+'">'+esc(x.t)+'</button></li>'}).join('')+'</ul>':'')+'</div>'}
+        (ss.length?'<ul class="sc-list">'+ss.map(function(x,i){return '<li class="tq-step'+(x.done?' done':'')+'"><button class="chk" data-act="ps" data-id="'+id+'" data-i="'+i+'" aria-label="'+(x.done?'Décocher : ':'Terminer : ')+esc(x.t)+'">'+CHECK+'</button><button class="tq-st" data-act="proj-open" data-id="'+id+'">'+esc(x.t)+'</button></li>'}).join('')+'</ul>':'')+'</div>'});
     var qH=rows;rows='';
     if(cal.status==='ok'){var now=new Date(),e=cal.events.filter(function(x){return x&&HID.indexOf(x.id)<0}).map(function(x){return {e:x,i:evInfo(x)}}).filter(function(x){return x.i&&x.i.n>=0&&(x.i.n>0||x.i.allDay||x.i.d>now)})[0];
       if(e)rows+='<button class="sc-ev" data-act="hub-go" data-v="agenda"><span class="k2-evd"><b>'+e.i.d.getDate()+'</b>'+esc(e.i.d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</span><span class="k2-evm"><span class="k2-evt">'+esc(EVN[e.e.id]||e.e.summary||'Événement')+'</span><span class="k2-evs">'+esc(cap(e.i.n===0?"aujourd'hui":e.i.n===1?'demain':e.i.d.toLocaleDateString('fr-FR',{weekday:'long'})))+(e.i.allDay?'':' · '+e.i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))+'</span></span></button>'}
@@ -644,13 +649,13 @@
     if(ae&&ae.matches&&ae.matches('#qtab select.pr'))return;
     var isFin=function(o){var ss=o.steps||[];return o.status==='done'||(ss.length&&ss.every(function(x){return x.done}))};
     var srt=function(a,b){var sa=a.status==='doing'?0:1,sb=b.status==='doing'?0:1;if(sa!==sb)return sa-sb;var q=(PW[b.prio]||2)-(PW[a.prio]||2);if(q)return q;return (a.createdAt||0)-(b.createdAt||0)};
-    var m=S.projects.filter(function(o){return o.main&&!isFin(o)})[0];
+    var MQ=S.projects.filter(function(o){return o.main&&!isFin(o)}).slice(0,3);
     var inCat=function(o){return qtCat==='all'||qCat(o)===qtCat};
-    var all=S.projects.filter(function(o){return !isFin(o)&&o!==m}),act=all.filter(inCat).sort(srt),fin=S.projects.filter(isFin).filter(inCat).sort(srt);
+    var all=S.projects.filter(function(o){return !isFin(o)&&MQ.indexOf(o)<0}),act=all.filter(inCat).sort(srt),fin=S.projects.filter(isFin).filter(inCat).sort(srt);
     var chips='<div class="qfil" role="tablist" aria-label="Filtrer les quêtes">'+[['all','🗂️','Toutes']].concat(QCATS).map(function(c){return '<button type="button" role="tab" class="qf'+(qtCat===c[0]?' on':'')+'" aria-selected="'+(qtCat===c[0])+'" data-act="qt-cat" data-v="'+c[0]+'">'+(c[1]?'<span aria-hidden="true">'+c[1]+'</span>':'')+c[2]+'</button>'}).join('')+'</div>';
     var cl=QCATL[qtCat],emptyTxt=qtCat==='all'?'Aucune autre quête. Une idée ? Ajoute-la avec « + Nouvelle ».':'Rien dans '+cl[1]+' '+cl[2]+' pour l\'instant.';
-    var hero=m?'<div class="qhero"><div class="qhero-h"><span>📌 Quête principale</span><img src="assets/kimchi-anim.svg" alt=""></div>'+qCard(m)+'</div>'
-      :'<div class="qhero empty"><div class="qhero-h"><span>📌 Quête principale</span><img src="assets/kimchi.svg" alt=""></div><p>Pas encore de quête principale. Touche 📌 sur une quête pour la mettre en avant.</p></div>';
+    var hero=MQ.length?'<div class="qhero"><div class="qhero-h"><span>📌 Quête'+(MQ.length>1?'s':'')+' principale'+(MQ.length>1?'s':'')+'</span><img src="assets/kimchi-anim.svg" alt=""></div>'+MQ.map(qCard).join('')+'</div>'
+      :'<div class="qhero empty"><div class="qhero-h"><span>📌 Quête principale</span><img src="assets/kimchi.svg" alt=""></div><p>Pas encore de quête principale. Touche 📌 sur une quête pour la mettre en avant (jusqu\'à 3).</p></div>';
     L.innerHTML=(loaded.projects?hero:'<p class="empty">Chargement…</p>')+
       '<div class="qt-sec">Quêtes secondaires'+(all.length?' <i>'+all.length+'</i>':'')+'</div>'+chips+
       (act.length?'<div class="qv-list">'+act.map(qCard).join('')+'</div>':'<p class="empty">'+emptyTxt+'</p>')+
@@ -675,6 +680,8 @@
     t=t.trim().slice(0,60);
     return {title:t,qty:q.slice(0,12),emoji:sp.emoji||'',done:false};
   }
+  var cAddCat='std'; /* catégorie choisie dans le formulaire d'ajout : quotidien ou exceptionnel */
+  function cExc(c){return c.cat==='exc'}
   /* Ordre de la liste : champ "ord" (dans _t), sinon date d'ajout */
   function cKey(c){return typeof c.ord==='number'&&isFinite(c.ord)?c.ord:Number(c.createdAt)||0}
   function renderCourses(){
@@ -683,8 +690,11 @@
     var todo=S.courses.filter(function(c){return !c.done}),inCart=S.courses.filter(function(c){return c.done});
     $('c-count').textContent='';var cvc=$('cv-count');if(cvc)cvc.textContent='';
     var row=function(c){return '<div class="crow'+(c.done?' done':'')+'" data-cid="'+esc(c.id)+'"><button class="cchk" data-act="c-toggle" data-id="'+esc(c.id)+'" aria-label="'+(c.done?'Remettre dans la liste : ':'Dans le panier : ')+esc(c.title)+'"><span class="circ">'+CHECK+'</span><span class="ct">'+esc(c.title)+'</span>'+(c.qty?'<span class="cq">'+esc(c.qty)+'</span>':'')+'</button><button class="sx" data-act="c-del" data-id="'+esc(c.id)+'" aria-label="Supprimer : '+esc(c.title)+'" title="Supprimer">×</button></div>'};
-    var h=todo.sort(function(a,b){return cKey(a)-cKey(b)}).map(row).join('');
-    if(!h)h='<p class="empty">'+(loaded.courses?(inCart.length?'Tout est dans le panier 🎉':'La liste est vide.'):'Chargement…')+'</p>';
+    var srt=function(a,b){return cKey(a)-cKey(b)},std=todo.filter(function(c){return !cExc(c)}).sort(srt),exc=todo.filter(cExc).sort(srt),h;
+    if(todo.length){
+      h='<div class="csec" data-sec="std"><span class="sec-label">🧺 Quotidien</span></div>'+(std.length?std.map(row).join(''):'<p class="chint">Rien pour l\'instant.</p>')+
+        '<div class="csec" data-sec="exc"><span class="sec-label">✨ Exceptionnel</span></div>'+(exc.length?exc.map(row).join(''):'<p class="chint">Les achats rares : entretien, bricolage, pièces… Ajoute avec ✨, ou glisse un article ici.</p>');
+    }else h='<p class="empty">'+(loaded.courses?(inCart.length?'Tout est dans le panier 🎉':'La liste est vide.'):'Chargement…')+'</p>';
     if(inCart.length)h+='<div class="cart-h"><span class="sec-label">Dans le panier ('+inCart.length+')</span><button class="lnk" data-act="c-clear">Vider le panier</button></div>'+inCart.map(row).join('');
     el.innerHTML=h;
     if(cOpen){var cl=$('cv-list'),ae=document.activeElement;if(cl&&!(ae&&cl.contains(ae)&&ae.tagName==='INPUT'))cl.innerHTML=h}
@@ -694,6 +704,7 @@
   (function(){
     var pend=null,HOLD=350;
     function rowsOf(list){return [].slice.call(list.querySelectorAll('.crow:not(.done)'))}
+    function secOf(r){for(var q=r.previousElementSibling;q;q=q.previousElementSibling)if(q.classList&&q.classList.contains('csec'))return q.getAttribute('data-sec')==='exc'?'exc':'std';return 'std'}
     function scroller(el){for(var p=el.parentElement;p&&p!==document.body;p=p.parentElement){var o=getComputedStyle(p).overflowY;if((o==='auto'||o==='scroll')&&p.scrollHeight>p.clientHeight)return p}return null}
     function begin(row,y){
       var list=row.parentElement,r=row.getBoundingClientRect();
@@ -708,26 +719,29 @@
       var vh=window.innerHeight,sp=y<90?-Math.ceil((90-y)/6):y>vh-110?Math.ceil((y-(vh-110))/6):0;
       if(sp){if(d.sc)d.sc.scrollTop+=sp;else window.scrollBy(0,sp);d.top0-=sp}
       /* déplacer la ligne dans la liste quand on passe la moitié d'une voisine */
-      var rows=rowsOf(d.list),i=rows.indexOf(row),mid,moved=true;
-      while(moved){moved=false;rows=rowsOf(d.list);i=rows.indexOf(row);
-        var nx=rows[i+1],pv=rows[i-1];
-        if(nx){var rn=nx.getBoundingClientRect();mid=rn.top+rn.height/2;if(y>mid){d.list.insertBefore(row,nx.nextSibling);moved=true;continue}}
-        if(pv){var rp=pv.getBoundingClientRect();mid=rp.top+rp.height/2;if(y<mid){d.list.insertBefore(row,pv);moved=true}}}
+      /* la ligne peut passer les en-têtes de section (Quotidien / Exceptionnel), pas le panier */
+      var mid,moved=true;
+      while(moved){moved=false;
+        var nx=row.nextElementSibling,pv=row.previousElementSibling;
+        if(nx&&!nx.classList.contains('cart-h')&&!nx.classList.contains('done')){var rn=nx.getBoundingClientRect();mid=rn.top+rn.height/2;if(rn.height&&y>mid){d.list.insertBefore(row,nx.nextSibling);moved=true;continue}}
+        if(pv&&!(pv.classList.contains('csec')&&pv.getAttribute('data-sec')==='std')){var rp=pv.getBoundingClientRect();mid=rp.top+rp.height/2;if(rp.height&&y<mid){d.list.insertBefore(row,pv);moved=true}}}
       row.style.transform='';var lay=row.getBoundingClientRect().top;
       row.style.transform='translateY('+(d.top0+(y-d.y0)-lay)+'px)';
       d.raf=requestAnimationFrame(frame)}
     function finish(){
       var d=cDrag;if(!d)return;cancelAnimationFrame(d.raf);cDrag=null;cNoClick=Date.now()+500;
       d.row.classList.remove('cdrag');d.list.classList.remove('cdragging');d.row.style.transform='';
-      var rows=rowsOf(d.list),i=rows.indexOf(d.row),id=d.row.getAttribute('data-cid'),it=find('courses',id);
+      var sec=secOf(d.row),rows=rowsOf(d.list).filter(function(r){return secOf(r)===sec}),i=rows.indexOf(d.row),id=d.row.getAttribute('data-cid'),it=find('courses',id);
       var key=function(r){var o=r&&find('courses',r.getAttribute('data-cid'));return o?cKey(o):null};
-      var a=key(rows[i-1]),b=key(rows[i+1]),cur=it?cKey(it):null,ord;
+      var a=key(rows[i-1]),b=key(rows[i+1]),cur=it?cKey(it):null,ch={},ord;
+      if(it&&cExc(it)!==(sec==='exc'))ch.cat=sec==='exc'?'exc':null; /* la ligne a changé de section */
       if(it&&!((a===null||a<cur)&&(b===null||cur<b))){
         if(a===null&&b===null)ord=cur;else if(a===null)ord=b-1000;else if(b===null)ord=a+1000;else ord=(a+b)/2;
-        if(a!==null&&b!==null&&!(b-a>1e-3)){ /* plus de place : on renumérote toute la liste */
+        if(a!==null&&b!==null&&!(b-a>1e-3)){ /* plus de place : on renumérote la section */
           var base=key(rows[0]);if(base===null)base=0;
           rows.forEach(function(r,j){var o=find('courses',r.getAttribute('data-cid'));if(o&&o.id!==id&&cKey(o)!==base+j*1000)upd('courses',o.id,{ord:base+j*1000})});ord=base+i*1000}
-        cDirty=false;upd('courses',id,{ord:ord});return}
+        if(ord!==cur)ch.ord=ord}
+      if(it&&('ord' in ch||'cat' in ch)){cDirty=false;upd('courses',id,ch);return}
       if(cDirty){cDirty=false;render()}}
     function cancelPend(){if(pend){clearTimeout(pend.t);pend=null}}
     function start(e,x,y){
@@ -965,13 +979,14 @@
       '<span class="vcd-sub">Départ '+esc(relDay(dPart(t.start)))+(da.exact?' à '+esc(hPart(t.start)):'')+'</span>'}
   function vSecH(ic,lab,type){return '<div class="vsec-h"><h3>'+ic+' '+lab+'</h3>'+(type?'<button class="mini" data-act="v-add" data-v="'+type+'">+ Ajouter</button>':'')+'</div>'}
   function vStay(k){var btn=k.place?'<a class="btn ghost" href="'+esc(mapsUrl(k.place))+'" target="_blank" rel="noopener noreferrer">📍 Plan ↗</a>':'';
-    return '<article class="vcard"><div class="vc-top"><div class="vc-h" role="button" tabindex="0" data-act="v-item" data-id="'+esc(k.id)+'" aria-label="Modifier : '+esc(k.title)+'"><span class="em" aria-hidden="true">🛏️</span><div class="main"><span class="t">'+esc(k.title)+'</span>'+(k.place?'<span class="sub">'+esc(k.place)+'</span>':'')+(k.notes?'<span class="vmeta">'+esc(k.notes)+'</span>':'')+'</div></div>'+btn+'</div></article>'}
+    return '<article class="vcard"><div class="vc-top"><div class="vc-h" role="button" tabindex="0" data-act="v-item" data-id="'+esc(k.id)+'" aria-label="Modifier : '+esc(k.title)+'"><span class="em" aria-hidden="true">'+(k.hk==='ami'?'🏡':'🛏️')+'</span><div class="main"><span class="t">'+esc(k.title)+'</span>'+(k.place?'<span class="sub">'+esc(k.place)+'</span>':'')+(k.notes?'<span class="vmeta">'+esc(k.notes)+'</span>':'')+'</div></div>'+btn+'</div></article>'}
   /* Trucs à faire du voyage (avant, sur place, après) : checklist comme une quête */
   var WHEN=[['avant','Avant'],['place','Sur place'],['apres','Après']],WHENL={avant:'Avant le départ',place:'Sur place',apres:'Au retour'};
   function whenOf(k){return WHENL[k.when]?k.when:'place'}
   function defWhen(t){var k=tripState(t).k;return k==='now'?'place':k==='past'?'apres':'avant'}
   function vTodo(t){var A=kids(t.id,'activite').sort(function(a,b){return (a.createdAt||0)-(b.createdAt||0)}),dn=A.filter(function(x){return x.done}).length,w=vtWhen||defWhen(t);
     var h='<div class="vsec-h"><h3>✅ Trucs à faire</h3></div><section class="vtodo">';
+    if(!A.length)h+='<p class="vempty">La checklist du voyage : réserver, préparer, ne rien oublier. Note un premier truc 👇</p>';
     if(A.length)h+='<div class="qc-prog"><div class="bar"><i style="width:'+Math.round(dn/A.length*100)+'%"></i></div><span>'+dn+'/'+A.length+'</span></div>';
     WHEN.forEach(function(g){var L=A.filter(function(x){return whenOf(x)===g[0]});if(!L.length)return;
       h+='<div class="vt-g">'+WHENL[g[0]]+'</div><ul class="tq-steps">'+L.map(function(k){var id=esc(k.id);
@@ -987,7 +1002,7 @@
       dt('🚆 Départ','start',t.start)+dt('🏠 Retour','end',t.end)+
       '</section>';
     var H=kids(t.id,'logement').sort(byStart);
-    h+=vSecH('🛏️','Hébergement','logement')+(H.length?H.map(vStay).join(''):'<p class="vempty">Pas encore d\'hébergement.</p>');
+    h+=vSecH('🛏️','Hébergement','logement')+(H.length?H.map(vStay).join(''):'<p class="vempty">Où dormez-vous ? Un hôtel, une location… ou juste « Chez Mamie ». Ajoute-le avec le bouton +.</p>');
     h+=vTodo(t);
     var P=packOf(t.id),pn=P?P.items.length:0,pd=P?P.items.filter(function(x){return x.done}).length:0;
     h+='<button class="vfold" data-act="pack-fold" aria-expanded="'+vPackOpen+'"><span>🧳 Valise</span><i>'+(pn?pd+'/'+pn:'vide')+'</i><b>'+(vPackOpen?'▾':'▸')+'</b></button>'+(vPackOpen?vPack(t):'');
@@ -1031,17 +1046,20 @@
     var inp=function(f,lab,ph,max){return '<div><div class="lab">'+lab+'</div><input class="in" maxlength="'+(max||120)+'" data-tf="'+f+'" value="'+esc(d[f]==null?'':d[f])+'" placeholder="'+esc(ph||'')+'" aria-label="'+esc(lab)+'"></div>'};
     var notes=function(lab,ph){return '<div class="lab">'+lab+'</div><textarea class="in notes" maxlength="1000" data-tf="notes" rows="2" placeholder="'+esc(ph)+'" aria-label="'+esc(lab)+'">'+esc(d.notes||'')+'</textarea>'};
     var h='<div class="panel tform"><div class="pj-title">'+(ty==='logement'?(isNew?'Nouvel hébergement':'Hébergement'):(isNew?'Nouveau truc à faire':'Truc à faire'))+'</div>';
-    if(ty==='logement')h+=inp('title','Nom','')+inp('place','Adresse','',200)+notes('Infos utiles (facultatif)','');
+    if(ty==='logement'){var hk=d.hk==='ami'?'ami':'loc';
+      h+='<div><div class="lab">On dort où ?</div><div class="vt-when">'+[['ami','🏡 Chez quelqu\'un'],['loc','🏨 Hôtel / location']].map(function(g){return '<button type="button" class="vtw'+(hk===g[0]?' on':'')+'" data-act="tf-set" data-f="hk" data-v="'+g[0]+'">'+g[1]+'</button>'}).join('')+'</div></div>'+
+        (hk==='ami'?inp('title','Chez qui ?','Chez Mamie, chez Léa…')+inp('place','Adresse (facultatif)','',200):inp('title','Nom','Hôtel, location…')+inp('place','Adresse','',200))+
+        notes('Infos utiles (facultatif)',hk==='ami'?'Code porte, étage, ce qu\'on apporte…':'Heure d\'arrivée, réservation…');}
     else{var wn=WHENL[d.when]?d.when:'place';h+=inp('title','Quoi','')+
       '<div><div class="lab">Quand</div><div class="vt-when">'+WHEN.map(function(g){return '<button type="button" class="vtw'+(wn===g[0]?' on':'')+'" data-act="tf-set" data-f="when" data-v="'+g[0]+'">'+g[1]+'</button>'}).join('')+'</div></div>'+
       '<div><div class="lab">Jour (facultatif)</div><input class="in" type="date" data-tf="sD" value="'+esc(d.sD||'')+'" aria-label="Jour"></div>'+notes('Note (facultatif)','')}
     h+='<div class="prow">'+(isNew?'':'<button class="lnk del" data-act="tf-del">Supprimer</button>')+'<button class="btn valid" data-act="tf-save">'+(isNew?'Ajouter':'Valider')+'</button></div></div>';
     return h}
-  function tSave(){var e=tEdit;if(!e)return;var d=e.d,sp=splitEmoji(d.title||''),title=sp.title||(e.type==='logement'?'Hébergement':'');
+  function tSave(){var e=tEdit;if(!e)return;var d=e.d,sp=splitEmoji(d.title||''),title=sp.title||(e.type==='logement'?(d.hk==='ami'?'Chez des amis':'Hébergement'):'');
     if(!title){var ti=document.querySelector('.sheet-card [data-tf="title"]');if(ti)ti.focus();return}
     var clip=function(v,n){return String(v==null?'':v).trim().slice(0,n)};
     var data={title:title,notes:clip(d.notes,1000)};
-    if(e.type==='logement')data.place=clip(d.place,200);
+    if(e.type==='logement'){data.place=clip(d.place,200);data.hk=d.hk==='ami'?'ami':'loc'}
     else{data.title=(sp.emoji?sp.emoji+' ':'')+title;data.start=nDate(d.sD)||'';data.when=WHENL[d.when]?d.when:'place'}
     tEdit=null;
     if(e.id==='new'){data.type=e.type;data.trip=d.trip;data.done=false;addDoc('voyages',data)}else upd('voyages',e.id,data);
@@ -1111,7 +1129,7 @@
     else if(a==='v-done'){it=find('voyages',id);if(it)updUndo('voyages',id,{done:!it.done},it.done?'Remis à faire':'Fait ✓')}
     else if(a==='vt-when'){vtWhen=b.getAttribute('data-v');vtFocus=!!$('vt-in')&&document.activeElement===$('vt-in');renderVView()}
     else if(a==='copy'){var v=b.getAttribute('data-v')||'';try{navigator.clipboard.writeText(v).then(function(){toastMsg('Référence copiée : '+v)},function(){toastMsg(v)})}catch(err){toastMsg(v)}}
-    else if(a==='tf-set'){if(tEdit){var f=b.getAttribute('data-f'),val=b.getAttribute('data-v');if(f==='emoji'){tEdit.d[f]=val;if(f==='emoji')iconOpen=false;renderSheet()}else if(f==='when'){tEdit.d.when=val;renderSheet()}}}
+    else if(a==='tf-set'){if(tEdit){var f=b.getAttribute('data-f'),val=b.getAttribute('data-v');if(f==='emoji'){tEdit.d[f]=val;if(f==='emoji')iconOpen=false;renderSheet()}else if(f==='when'){tEdit.d.when=val;renderSheet()}else{tEdit.d[f]=val;renderSheet()}}}
     else if(a==='tf-save'){tSave()}
     else if(a==='tf-del'){tDel()}
     else if(a==='undo-multi'){if(lastMulti){var l=lastMulti;lastMulti=null;hideToast();l.forEach(function(o){if(!find('voyages',o.id)){S.voyages.push(o);shWrite('voyages',o)}});render()}}
@@ -1185,14 +1203,14 @@
   function renderMain(){
     var el=$('l-main');if(!el)return;
     var ae=document.activeElement;if(ae&&el.contains(ae)&&ae.tagName==='INPUT'&&ae.value)return;
-    var m=S.projects.filter(function(p){return p.main&&p.status!=='done'})[0],h='';
-    if(m){var ss=m.steps||[],nx=-1,id=esc(m.id),nm=esc((m.emoji?m.emoji+' ':'')+m.title);ss.some(function(x,i){if(!x.done){nx=i;return true}});var dn=ss.filter(function(x){return x.done}).length;
+    var MQ=mains3(),h='';
+    MQ.forEach(function(m){var ss=m.steps||[],nx=-1,id=esc(m.id),nm=esc((m.emoji?m.emoji+' ':'')+m.title);ss.some(function(x,i){if(!x.done){nx=i;return true}});var dn=ss.filter(function(x){return x.done}).length;
       /* Toutes les étapes de la quête principale : le rond coche, le texte ouvre la quête */
       var steps=ss.map(function(x,i){return '<li class="tq-step'+(x.done?' done':'')+'"><button class="chk" data-act="ps" data-id="'+id+'" data-i="'+i+'" aria-label="'+(x.done?'Décocher : ':'Terminer : ')+esc(x.t)+'">'+CHECK+'</button><button class="tq-st" data-act="proj-open" data-id="'+id+'">'+esc(x.t)+'</button></li>'}).join('');
       h+='<div class="tq"><div class="tq-k">📌 Quête principale'+(ss.length?' · '+dn+'/'+ss.length:'')+'</div><button class="tq-t" data-act="proj-open" data-id="'+id+'"><b>'+nm+'</b></button>'+
         (ss.length?'<div class="bar tq-bar"><i style="width:'+Math.round(dn/ss.length*100)+'%"></i></div><ul class="tq-steps">'+steps+'</ul>':'<button class="tq-st tq-add" data-act="proj-open" data-id="'+id+'">+ Ajoute une première étape</button>')+
-        (ss.length&&nx<0?'<div class="tq-row"><span class="tq-win">Quête accomplie 🎉</span><button class="btn tq-next" data-act="main-finish" data-id="'+id+'">Choisir la suivante</button></div>':'')+'</div>'}
-    else h+='<button class="tq tq-none" data-act="qview-open"><span class="tq-k">📌 Pas de quête principale</span><span class="tq-t"><span>Ouvre les quêtes et épingles-en une</span></span></button>';
+        (ss.length&&nx<0?'<div class="tq-row"><span class="tq-win">Quête accomplie 🎉</span><button class="btn tq-next" data-act="main-finish" data-id="'+id+'">Choisir la suivante</button></div>':'')+'</div>'});
+    if(!MQ.length)h+='<button class="tq tq-none" data-act="qview-open"><span class="tq-k">📌 Pas de quête principale</span><span class="tq-t"><span>Ouvre les quêtes et épingles-en une</span></span></button>';
     var R={r:0,o:1},due=S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue).sort(function(a,b){return R[a.st.c]-R[b.st.c]});
     h+='<div class="tsec">À faire'+(due.length?' <i>'+due.length+'</i>':'')+'</div>'+(due.length?due.map(function(x){var r=x.r;return '<div class="tarow '+x.st.c+'">'+careChk(r)+'<div class="main" role="button" tabindex="0" data-act="care-open" data-id="'+esc(r.id)+'"><span class="t">'+(r.emoji?esc(r.emoji)+' ':'')+esc(r.title)+'</span><span class="sub">'+esc((r.group||'Maison')+' · '+x.st.txt)+'</span></div></div>'}).join(''):'<p class="tempty">'+(loaded.routines?'Tout est à jour ✨':'Chargement…')+'</p>');
     el.innerHTML=h;
@@ -1242,7 +1260,9 @@
     else if(a==='step-ren'){stepRen(b)}
     else if(a==='ps'){it=find('projects',id);if(it){var st=steps(it);var i=Number(b.getAttribute('data-i'));if(st[i]){st[i].done=!st[i].done;updUndo('projects',id,{steps:st},st[i].done?'Mini-quête validée ✓':'Mini-quête décochée')}}}
     else if(a==='proj-open'){iconOpen=false;projId=id;openId=null;confirmDel=null;renderSheet()}
-    else if(a==='pmain'){it=find('projects',id);if(it){if(it.main){upd('projects',id,{main:false})}else{S.projects.forEach(function(q){if(q.main&&q.id!==id)upd('projects',q.id,{main:false})});upd('projects',id,{main:true})}projId=null;renderSheet()}}
+    else if(a==='pmain'){it=find('projects',id);if(it){if(it.main)upd('projects',id,{main:false});
+      else if(S.projects.filter(function(q){return q.main&&q.status!=='done'}).length>=3){toastMsg('Déjà 3 quêtes principales 📌 — retire-en une pour en épingler une autre');return}
+      else upd('projects',id,{main:true});projId=null;renderSheet()}}
     else if(a==='main-finish'){updUndo('projects',id,{main:false,status:'done'},'Quête accomplie 🎉')}
     else if(a==='ppick'){iconOpen=false;upd('projects',id,{emoji:b.getAttribute('data-e'),autoIcon:false});renderSheet()}
     else if(a==='icon-toggle'){iconOpen=!iconOpen;renderSheet()}
@@ -1250,7 +1270,7 @@
     else if(a==='undo-del'){restoreDel()}
     else if(a==='undo-upd'){undoUpd()}
     else if(a==='pick-emoji'){iconOpen=false;upd('routines',id,{emoji:b.getAttribute('data-e'),autoIcon:false});renderSheet()}
-    else if(a==='care-open'){iconOpen=false;projId=null;openId=id;calFor=null;confirmDel=null;renderSheet()}
+    else if(a==='care-open'){iconOpen=false;projId=null;openId=id;calFor=null;confirmDel=null;snzOther=false;renderSheet()}
     else if(a==='proj-save'){var si2=document.querySelector('.sheet-card [data-stepinput]'),pv=si2&&si2.value.trim().slice(0,120),pq=find('projects',id);
       if(pv&&pq){upd('projects',id,{steps:steps(pq).concat([{t:pv,done:false}])})}
       projId=null;confirmDel=null;renderSheet()}
@@ -1268,6 +1288,7 @@
       if(!(n>0&&n<=365)){toastMsg('Entre un nombre de jours');return}
       var pvs=snap('routines',id,['snoozeUntil']),dd=new Date();dd.setDate(dd.getDate()+n);openId=null;calFor=null;upd('routines',id,{snoozeUntil:iso(dd)});renderSheet();offerUndo('routines',id,pvs,'En pause pour '+n+' jour'+(n>1?'s':'')+' 💤')}
     else if(a==='snooze-clear'){var pvc=snap('routines',id,['snoozeUntil']);openId=null;calFor=null;upd('routines',id,{snoozeUntil:null});renderSheet();offerUndo('routines',id,pvc,'La tâche est de retour ✓')}
+    else if(a==='snz-other'){snzOther=!snzOther;renderSheet();if(snzOther){var sni=document.querySelector('.sheet-card [data-snzn]');if(sni){sni.focus();sni.select()}}}
     else if(a==='undo'){openId=null;calFor=null;undoDate(id);renderSheet()}
     else if(a==='del'){var rg=(find('routines',id)||{}).group;openId=null;calFor=null;confirmDel=null;renderSheet();delUndo('routines',id,rg==='Plantes'?'Plante supprimée':rg==='Kimchi'?'Tâche de Kimchi supprimée':'Tâche maison supprimée')}
     else if(a==='wishq-toggle'){var fw=$('f-wish');fw.hidden=!fw.hidden;if(!fw.hidden)$('w-title').focus()}
@@ -1292,6 +1313,7 @@
     else if(a==='wf-del'){var wid=wishOpen;wishOpen=null;renderSheet();delUndo('shop',wid,'Envie supprimée')}
     else if(a==='tab'){setTab(b.getAttribute('data-tab'))}
     else if(a==='course-toggle'){var cf2=$('f-course');cf2.hidden=!cf2.hidden;if(!cf2.hidden)$('c-title').focus()}
+    else if(a==='ccat'){cAddCat=b.getAttribute('data-v')==='exc'?'exc':'std';[].forEach.call(document.querySelectorAll('.ccat .vtw'),function(x){var on=x.getAttribute('data-v')===cAddCat;x.classList.toggle('on',on);x.setAttribute('aria-checked',String(on))});var cfm=b.closest('form');if(cfm){var cfi=cfm.querySelector('input');if(cfi)cfi.focus()}}
     else if(a==='c-toggle'){it=find('courses',id);if(it)updUndo('courses',id,{done:!it.done},it.done?'Remis dans la liste':'Dans le panier ✓')}
     else if(a==='c-del'){delUndo('courses',id,'Article supprimé')}
     else if(a==='c-clear'){clearCart()}
@@ -1346,9 +1368,10 @@
     if(f.id==='f-course'||f.id==='f-course2'){
       var ci2=f.querySelector('input'),pc=parseCourse(ci2.value);if(!pc.title)return;
       var dup=S.courses.filter(function(c){return nrm(c.title)===nrm(pc.title)})[0];
-      /* Un nouvel article (ou un article remis dans la liste) arrive en haut */
-      var ks=S.courses.filter(function(c){return !c.done&&c!==dup}).map(cKey),top=ks.length?Math.min.apply(null,ks)-1000:null;
-      if(dup){var dch={done:false,qty:pc.qty||dup.qty};if(top!==null)dch.ord=top;upd('courses',dup.id,dch)}else{if(top!==null)pc.ord=top;addDoc('courses',pc)}
+      /* Un nouvel article (ou un article remis dans la liste) arrive en haut de sa catégorie */
+      var cat=cAddCat==='exc'?'exc':null;
+      var ks=S.courses.filter(function(c){return !c.done&&c!==dup&&cExc(c)===(cat==='exc')}).map(cKey),top=ks.length?Math.min.apply(null,ks)-1000:null;
+      if(dup){var dch={done:false,qty:pc.qty||dup.qty,cat:cat};if(top!==null)dch.ord=top;upd('courses',dup.id,dch)}else{pc.cat=cat;if(top!==null)pc.ord=top;addDoc('courses',pc)}
       ci2.value='';ci2.focus();return;
     }
     if(f.getAttribute('data-form')==='tplitem'){var ti2=f.querySelector('input'),tv2=ti2.value.trim().slice(0,80);if(!tv2||!tplEdit)return;

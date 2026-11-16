@@ -124,7 +124,7 @@ def main():
                     assert page.is_visible('.sheet-card .bigdone'); page.click('.sheet-x'); page.wait_for_timeout(200)
                     # mise en pause d'une tâche : elle quitte « À faire », puis revient avec Annuler
                     page.click('#l-Maison .row .t'); page.wait_for_timeout(300)
-                    page.fill('[data-snzn]', '5'); page.click('.snzgo'); page.wait_for_timeout(800)
+                    page.click('.sheet-card .snzc >> text=1 semaine'); page.wait_for_timeout(800)
                     assert 'snoozeUntil' in state['routines'][2][7], state['routines'][2]
                     assert page.locator('#l-todoall .tarow').count() == 0, 'tâche en pause masquée de À faire'
                     page.click('[data-act=undo-upd]'); page.wait_for_timeout(800)
@@ -135,8 +135,10 @@ def main():
                     assert page.locator('.sheet-card [data-field=name]').count() == 1, "un seul champ de titre"
                     assert page.locator('.sheet-card .lab').all_inner_texts() == ['Rappel', 'Pause'], page.locator('.sheet-card .lab').all_inner_texts()
                     assert page.locator('.sheet-card .thr:not(.snzrow) [data-snzn]').count() == 0, 'la pause ne doit pas être dans Rappel'
+                    assert page.locator('.sheet-card .snzc').count() == 5, 'boutons rapides de pause'
+                    page.click('.sheet-card [data-act=snz-other]'); page.wait_for_timeout(200)
                     page.fill('[data-snzn]', '5'); page.keyboard.press('Enter'); page.wait_for_timeout(600)
-                    assert 'snoozeUntil' in state['routines'][2][7], 'Entrée dans le champ valide la pause'
+                    assert 'snoozeUntil' in state['routines'][2][7], 'Entrée dans le champ « Autre » valide la pause'
                     page.click('#l-Maison .row .t'); page.wait_for_timeout(300)
                     assert page.is_visible('.sheet-card [data-act=snooze-clear]'), 'bouton Reprendre quand la tâche est en pause'
                     page.click('.sheet-card [data-act=snooze-clear]'); page.wait_for_timeout(700)
@@ -172,6 +174,16 @@ def main():
                     assert order == ['pain', 'lait', 'tomates'], order
                     assert not any(r[5] for r in state['courses']), 'le glisser ne doit pas cocher'
                     assert '"ord"' in [r for r in state['courses'] if r[2] == 'tomates'][0][6], state['courses']
+                if name == 'mobile':
+                    # deux catégories : un article ajouté avec ✨ atterrit dans « Exceptionnel »
+                    assert page.locator('#l-courses .csec').count() == 2, 'en-têtes Quotidien / Exceptionnel'
+                    page.click('#f-course .ccat [data-v=exc]'); page.wait_for_timeout(100)
+                    page.fill('#c-title', 'liquide vaisselle'); page.keyboard.press('Enter'); page.wait_for_timeout(800)
+                    lv = [r for r in state['courses'] if r[2] == 'liquide vaisselle']
+                    assert lv and '"cat": "exc"' in lv[0][6].replace('":"', '": "'), state['courses']
+                    exc_rows = page.eval_on_selector_all('#l-courses .csec[data-sec=exc] ~ .crow:not(.done) .ct', 'e => e.map(x => x.textContent)')
+                    assert exc_rows == ['liquide vaisselle'], exc_rows
+                    page.click('#f-course .ccat [data-v=std]'); page.wait_for_timeout(100)
                 page.screenshot(path=f'{OUT}/{name}-courses.png', full_page=True)
                 page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(300)
                 if name == 'mobile':
@@ -233,6 +245,28 @@ def main():
                     card.locator('.qc-end').click(); page.wait_for_timeout(700)
                     assert '"status": "done"' in [r for r in state['projects'] if r[0] == 'p3'][0][5].replace('":"', '": "')
                     page.click('[data-act=undo-upd]'); page.wait_for_timeout(700)
+                if name == 'mobile':
+                    # jusqu'à 3 quêtes principales, pas une de plus
+                    page.click('#qt-list .qv-list .qc-t >> text=Vin chaud'); page.wait_for_timeout(300)
+                    page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(700)
+                    page.click('#qt-list .qv-list .qc-t >> text=Changer les rideaux'); page.wait_for_timeout(300)
+                    page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(700)
+                    assert sum(1 for r in state['projects'] if r[3] == 'oui') == 3, state['projects']
+                    assert page.locator('.qhero .qcard').count() == 3, 'trois quêtes principales en avant'
+                    assert 'Quêtes principales' in page.inner_text('.qhero-h')
+                    page.click('#qt-list .qv-list .qc-t >> text=Aller au ciné'); page.wait_for_timeout(300)
+                    page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(500)
+                    assert sum(1 for r in state['projects'] if r[3] == 'oui') == 3, 'pas de 4e quête principale'
+                    page.click('.sheet-x'); page.wait_for_timeout(300)
+                    # sur l'accueil, les 3 quêtes principales et leurs mini-quêtes
+                    page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(400)
+                    assert page.locator('#l-main .tq').count() == 3, 'accueil : 3 quêtes principales'
+                    page.click('.h2btn'); page.wait_for_timeout(400)
+                    # on dépingle les 2 ajouts pour la suite du test
+                    for t in ['Vin chaud', 'Changer les rideaux']:
+                        page.click(f'.qhero .qc-t >> text={t}'); page.wait_for_timeout(300)
+                        page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(700)
+                    assert sum(1 for r in state['projects'] if r[3] == 'oui') == 1, state['projects']
                 assert page.is_visible('.qhero'), 'onglet Quêtes'; page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(300)
                 # ---- Voyages ----
                 assert page.is_visible('#trip-next'), 'pas de compte à rebours sur l\'accueil'
@@ -258,6 +292,13 @@ def main():
                     assert 'lien externe' in page.inner_text('.sheet-card') and page.is_visible('.sheet-card a[data-close]')
                     page.screenshot(path=f'{OUT}/{name}-billets-popup.png')
                     page.click('.sheet-x'); page.wait_for_timeout(200)
+                    # hébergement « chez quelqu'un » : juste un nom, pas d'adresse obligatoire
+                    page.click('[data-act=v-add][data-v=logement]'); page.wait_for_timeout(300)
+                    page.click('.sheet-card [data-act=tf-set][data-f=hk][data-v=ami]'); page.wait_for_timeout(300)
+                    page.fill('.sheet-card [data-tf=title]', 'Chez Tonton'); page.click('[data-act=tf-save]'); page.wait_for_timeout(800)
+                    r = [r for r in state['voyages'] if r[3] == 'Chez Tonton']
+                    assert r and r[0][2] == 'Hébergement' and '"hk": "ami"' in r[0][11].replace('":"', '": "'), r
+                    assert '🏡' in page.inner_text('#vv-body'), 'icône maison pour « chez quelqu\'un »'
                     assert page.is_visible('.vtodo .qc-prog'), 'barre de progression des trucs à faire'
                     page.click('.vt-when [data-v=apres]'); page.fill('#vt-in', 'Développer les photos'); page.keyboard.press('Enter'); page.wait_for_timeout(800)
                     r = [r for r in state['voyages'] if r[3] == 'Développer les photos']
