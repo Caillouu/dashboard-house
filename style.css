@@ -1205,7 +1205,10 @@ body[data-tab="maison"] .addgrp{display:flex}
 
 /* v89 : période d'une quête — un seul champ, un seul calendrier pour le début et la fin */
 .qdrow{display:flex;align-items:center;gap:6px}
-.qdbtn{flex:1;min-width:0;text-align:left;font-weight:800;color:var(--ink2);cursor:pointer;box-shadow:inset 0 0 0 1.5px rgba(141,123,240,.18)}
+.qdbtn{position:relative;flex:1;min-width:0;text-align:left;padding-right:36px;font-weight:800;color:var(--ink2);cursor:pointer;box-shadow:inset 0 0 0 1.5px rgba(141,123,240,.18)}
+/* même chevron que les menus déroulants juste au-dessus, retourné quand le calendrier est ouvert */
+.qdbtn::after{content:"";position:absolute;right:15px;top:50%;width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-70%) rotate(45deg);opacity:.75;transition:transform .15s}
+.qdbtn.open::after{transform:translateY(-25%) rotate(-135deg)}
 .qdbtn.set{color:var(--ink)}
 .qdbtn.open{background:#fff;box-shadow:inset 0 0 0 1.5px var(--lav);color:var(--lav)}
 .qcal{margin-top:8px;background:#fff;box-shadow:inset 0 0 0 1.5px rgba(141,123,240,.18)}
