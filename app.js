@@ -257,7 +257,7 @@
   function qRangeTxt(o){
     var a=o.qfrom,b=o.quntil;
     if(a&&b)return fmtDay(a,{day:'numeric',month:'short'})+' → '+fmtDay(b,{day:'numeric',month:'short'});
-    if(a)return fmtDay(a,{day:'numeric',month:'short'})+' →';
+    if(a)return fmtDay(a,{day:'numeric',month:'short'});   /* une seule date : pas de flèche */
     if(b)return '→ '+fmtDay(b,{day:'numeric',month:'short'});
     return '';
   }
@@ -640,7 +640,7 @@
         sel('pstatus','Avancement',[['todo','À faire'],['doing','En cours'],['done','Terminé']],st)+
         sel('pprio','Urgence',[['high','🔥 Urgent'],['med','⏳ Pas urgent'],['low','💡 Idée']],PRIO[o.prio]?o.prio:'med')+
         sel('pcat','Catégorie',QCATS.map(function(c){return [c[0],c[1]+' '+c[2]]}),qCat(o),true)+
-        '<div class="qp-f full"><span class="lab">Période</span><div class="qdrow"><button type="button" class="in qdbtn'+(qCal===o.id?' open':'')+(qRangeTxt(o)?' set':'')+'" data-act="qcal" data-id="'+id+'" aria-expanded="'+(qCal===o.id)+'">'+(qRangeTxt(o)||'Choisir une date')+'</button>'+
+        '<div class="qp-f full"><span class="lab">C\'est quand ?</span><div class="qdrow"><button type="button" class="in qdbtn'+(qCal===o.id?' open':'')+(qRangeTxt(o)?' set':'')+'" data-act="qcal" data-id="'+id+'" aria-expanded="'+(qCal===o.id)+'">'+(qRangeTxt(o)||'Choisir une date')+'</button>'+
           (o.qfrom||o.quntil?'<button type="button" class="sx" data-act="qdclear" data-id="'+id+'" aria-label="Effacer la période" title="Effacer">×</button>':'')+'</div>'+
           (qCal===o.id?qCalHtml(o):'')+'</div>'+
         '</div>'+

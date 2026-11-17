@@ -339,6 +339,7 @@ def main():
                     assert state['projects'][0][5].count('qfrom') == 1 and 'quntil' not in state['projects'][0][5], state['projects'][0]
                     assert page.is_visible('.sheet-card .qcal'), 'le calendrier reste ouvert pour une fin éventuelle'
                     assert page.locator('.sheet-card .cd.r0.only').count() == 1, 'un seul jour sélectionné'
+                    assert '→' not in page.inner_text('.sheet-card .qdbtn'), 'une seule date : pas de flèche'
                     _pick(page, _d(8)); page.wait_for_timeout(700)   # un second jour plus tard = la fin
                     assert '"quntil"' in state['projects'][0][5], state['projects'][0]
                     assert not page.is_visible('.sheet-card .qcal'), 'le calendrier se referme une fois la fin choisie'
