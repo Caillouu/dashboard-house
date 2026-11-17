@@ -73,6 +73,19 @@ def handle(route):
     route.fulfill(status=200, content_type='application/json', body=json.dumps(r))
 
 
+def _pick(page, day):
+    """Clique le jour `day` (AAAA-MM-JJ) dans le calendrier de période, en naviguant au bon mois."""
+    want = int(day[:4]) * 12 + int(day[5:7])
+    for _ in range(26):
+        cell = page.locator(f'.sheet-card .qcal [data-date="{day}"]')
+        if cell.count():
+            cell.click(); return
+        shown = page.get_attribute('.sheet-card .qcal [data-date]', 'data-date')
+        cur = int(shown[:4]) * 12 + int(shown[5:7])
+        page.click('.sheet-card [data-act=qcal-%s]' % ('next' if want > cur else 'prev')); page.wait_for_timeout(120)
+    raise AssertionError(f'jour {day} introuvable dans le calendrier')
+
+
 def main():
     srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(PORT), '-d', ROOT],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -317,7 +330,23 @@ def main():
                     assert sum(1 for r in state['projects'] if r[3] == 'oui') == 1, state['projects']
                     # période : pas encore commencée -> badge, absente de l'accueil
                     page.click('.qhero .qc-t >> text=Réparer robinet'); page.wait_for_timeout(300)
-                    page.fill('.sheet-card [data-field=qfrom]', _d(5)); page.locator('.sheet-card [data-field=qfrom]').dispatch_event('change'); page.wait_for_timeout(700)
+                    # un seul champ : « Choisir une date », puis un calendrier début → fin
+                    assert page.inner_text('.sheet-card .qdbtn') == 'Choisir une date'
+                    assert page.locator('.sheet-card [data-field=qfrom]').count() == 0, 'plus de deux champs date'
+                    page.click('.sheet-card [data-act=qcal]'); page.wait_for_timeout(300)
+                    assert page.is_visible('.sheet-card .qcal'), 'le calendrier s\'ouvre'
+                    _pick(page, _d(5)); page.wait_for_timeout(700)
+                    assert state['projects'][0][5].count('qfrom') == 1 and 'quntil' not in state['projects'][0][5], state['projects'][0]
+                    assert page.is_visible('.sheet-card .qcal'), 'le calendrier reste ouvert pour une fin éventuelle'
+                    assert page.locator('.sheet-card .cd.r0.only').count() == 1, 'un seul jour sélectionné'
+                    _pick(page, _d(8)); page.wait_for_timeout(700)   # un second jour plus tard = la fin
+                    assert '"quntil"' in state['projects'][0][5], state['projects'][0]
+                    assert not page.is_visible('.sheet-card .qcal'), 'le calendrier se referme une fois la fin choisie'
+                    assert '→' in page.inner_text('.sheet-card .qdbtn')
+                    page.click('.sheet-card [data-act=qdclear]'); page.wait_for_timeout(700)
+                    assert page.inner_text('.sheet-card .qdbtn') == 'Choisir une date', 'la croix efface la période'
+                    page.click('.sheet-card [data-act=qcal]'); page.wait_for_timeout(300)
+                    _pick(page, _d(5)); page.wait_for_timeout(700)
                     assert '"qfrom"' in state['projects'][0][5], state['projects'][0]
                     page.click('.sheet-x'); page.wait_for_timeout(300)
                     assert 'à partir du' in page.inner_text('.qhero'), 'badge « à partir du »'
@@ -326,14 +355,16 @@ def main():
                     page.click('.h2btn'); page.wait_for_timeout(400)
                     # période : terminée hier -> la quête est considérée comme faite
                     page.click('.qhero .qc-t >> text=Réparer robinet'); page.wait_for_timeout(300)
-                    page.fill('.sheet-card [data-field=qfrom]', ''); page.locator('.sheet-card [data-field=qfrom]').dispatch_event('change'); page.wait_for_timeout(500)
-                    page.fill('.sheet-card [data-field=quntil]', _d(-1)); page.locator('.sheet-card [data-field=quntil]').dispatch_event('change'); page.wait_for_timeout(700)
+                    page.click('.sheet-card [data-act=qdclear]'); page.wait_for_timeout(600)
+                    page.click('.sheet-card [data-act=qcal]'); page.wait_for_timeout(300)
+                    _pick(page, _d(-3)); page.wait_for_timeout(600)
+                    _pick(page, _d(-1)); page.wait_for_timeout(700)   # période terminée hier
                     page.click('.sheet-x'); page.wait_for_timeout(400)
                     assert page.locator('.qhero .qcard').count() == 0, 'la période passée sort la quête du héros'
                     assert 'Terminées' in page.inner_text('#qt-list'), 'la quête passée est dans Terminées'
                     page.click('#qt-list .donetog'); page.wait_for_timeout(400)
                     page.click('#qt-list .qcard.done .qc-t >> text=Réparer robinet'); page.wait_for_timeout(300)
-                    page.fill('.sheet-card [data-field=quntil]', ''); page.locator('.sheet-card [data-field=quntil]').dispatch_event('change'); page.wait_for_timeout(700)
+                    page.click('.sheet-card [data-act=qdclear]'); page.wait_for_timeout(700)
                     page.click('.sheet-x'); page.wait_for_timeout(400)
                     assert page.locator('.qhero .qcard').count() == 1, 'période effacée : la quête revient'
                 assert page.is_visible('.qhero'), 'onglet Quêtes'; page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(300)

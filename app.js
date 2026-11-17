@@ -251,6 +251,32 @@
     return m?{emoji:m[1],title:m[2].trim().slice(0,80)}:{emoji:'',title:String(v).trim().slice(0,80)};
   }
   var calFor=null,calMonth=null;
+  /* Période d'une quête : un seul sélecteur. Le premier jour touché est le début,
+     un second jour plus tard devient la fin. Toucher un jour avant le début recommence. */
+  var qCal=null,qCalM=null;
+  function qRangeTxt(o){
+    var a=o.qfrom,b=o.quntil;
+    if(a&&b)return fmtDay(a,{day:'numeric',month:'short'})+' → '+fmtDay(b,{day:'numeric',month:'short'});
+    if(a)return fmtDay(a,{day:'numeric',month:'short'})+' →';
+    if(b)return '→ '+fmtDay(b,{day:'numeric',month:'short'});
+    return '';
+  }
+  function qCalHtml(o){
+    var m=qCalM,y=m.getFullYear(),mo=m.getMonth(),id=esc(o.id);
+    var startDow=(new Date(y,mo,1).getDay()+6)%7,days=new Date(y,mo+1,0).getDate(),today=iso(new Date()),a=o.qfrom||'',b=o.quntil||'';
+    var h='<div class="cal qcal"><div class="cal-h"><button type="button" class="lnk" data-act="qcal-prev" aria-label="Mois précédent">‹</button><b>'+esc(cap(m.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})))+'</b><button type="button" class="lnk" data-act="qcal-next" aria-label="Mois suivant">›</button></div><div class="cal-g">';
+    ['L','M','M','J','V','S','D'].forEach(function(d){h+='<i>'+d+'</i>'});
+    for(var k=0;k<startDow;k++)h+='<span></span>';
+    for(var d=1;d<=days;d++){
+      var di=y+'-'+pad(mo+1)+'-'+pad(d),c='cd';
+      if(di===a)c+=' r0'+(b?'':' only');
+      else if(di===b)c+=' r1';
+      else if(a&&b&&di>a&&di<b)c+=' rin';
+      if(di===today)c+=' today';
+      h+='<button type="button" class="'+c+'" data-act="qcal-pick" data-id="'+id+'" data-date="'+di+'">'+d+'</button>';
+    }
+    return h+'</div></div>';
+  }
   function calHtml(r){
     var m=calMonth,y=m.getFullYear(),mo=m.getMonth();
     var startDow=(new Date(y,mo,1).getDay()+6)%7,days=new Date(y,mo+1,0).getDate(),today=iso(new Date()),sel=r.lastDone||'';
@@ -614,8 +640,9 @@
         sel('pstatus','Avancement',[['todo','À faire'],['doing','En cours'],['done','Terminé']],st)+
         sel('pprio','Urgence',[['high','🔥 Urgent'],['med','⏳ Pas urgent'],['low','💡 Idée']],PRIO[o.prio]?o.prio:'med')+
         sel('pcat','Catégorie',QCATS.map(function(c){return [c[0],c[1]+' '+c[2]]}),qCat(o),true)+
-        '<label class="qp-f"><span class="lab">Début</span><input class="in" type="date" data-field="qfrom" value="'+esc(o.qfrom||'')+'" aria-label="Début"></label>'+
-        '<label class="qp-f"><span class="lab">Fin</span><input class="in" type="date" data-field="quntil" value="'+esc(o.quntil||'')+'" aria-label="Fin"></label>'+
+        '<div class="qp-f full"><span class="lab">Période</span><div class="qdrow"><button type="button" class="in qdbtn'+(qCal===o.id?' open':'')+(qRangeTxt(o)?' set':'')+'" data-act="qcal" data-id="'+id+'" aria-expanded="'+(qCal===o.id)+'">'+(qRangeTxt(o)||'Choisir une date')+'</button>'+
+          (o.qfrom||o.quntil?'<button type="button" class="sx" data-act="qdclear" data-id="'+id+'" aria-label="Effacer la période" title="Effacer">×</button>':'')+'</div>'+
+          (qCal===o.id?qCalHtml(o):'')+'</div>'+
         '</div>'+
         '<div class="qp-sw"><span>📌 Quête principale</span><button type="button" class="sw" role="switch" aria-checked="'+(!!o.main)+'" aria-label="Quête principale" data-act="pmain" data-id="'+id+'"></button></div></section>'+
       '<section class="qp-box"><div class="lab">Liens et notes</div><textarea class="in notes" maxlength="2000" data-field="pnotes" rows="3" placeholder="" aria-label="Liens et notes">'+esc(o.notes||'')+'</textarea>'+
@@ -1281,9 +1308,18 @@
       document.body.appendChild(m);var r=b.getBoundingClientRect(),w=m.offsetWidth,h=m.offsetHeight,x=Math.min(window.innerWidth-w-8,Math.max(8,r.right-w)),y=r.bottom+6;if(y+h>window.innerHeight-8)y=r.top-h-6;
       m.style.left=x+'px';m.style.top=y+'px';var f0=m.querySelector('.on');if(f0)f0.focus({preventScroll:true});return}
     if(a==='pset'){var f=b.getAttribute('data-f'),v=b.getAttribute('data-v');if((f==='prio'&&PRIO[v])||(f==='status'&&NEXT[v])||(f==='cat'&&QCATL[v])){var o2={};o2[f]=v;if(f==='status'&&v==='done')updUndo('projects',id,o2,'Quête terminée');else upd('projects',id,o2)}}
+    else if(a==='qcal'){if(qCal===id)qCal=null;else{qCal=id;var qo=find('projects',id),qb=qo&&qo.qfrom?parse(qo.qfrom):new Date();qCalM=new Date(qb.getFullYear(),qb.getMonth(),1)}renderSheet()}
+    else if(a==='qcal-prev'){qCalM=new Date(qCalM.getFullYear(),qCalM.getMonth()-1,1);renderSheet()}
+    else if(a==='qcal-next'){qCalM=new Date(qCalM.getFullYear(),qCalM.getMonth()+1,1);renderSheet()}
+    else if(a==='qcal-pick'){var qd=b.getAttribute('data-date'),qp=find('projects',id);if(qp){
+      if(!qp.qfrom||qp.quntil||qd<qp.qfrom)upd('projects',id,{qfrom:qd,quntil:null});           /* premier jour : le début */
+      else if(qd===qp.qfrom){qCal=null;upd('projects',id,{quntil:null})}                        /* le même jour : une seule date */
+      else{qCal=null;upd('projects',id,{quntil:qd})}                                            /* un jour plus tard : la fin */
+      renderSheet()}}
+    else if(a==='qdclear'){qCal=null;upd('projects',id,{qfrom:null,quntil:null});renderSheet()}
     else if(a==='step-ren'){stepRen(b)}
     else if(a==='ps'){it=find('projects',id);if(it){var st=steps(it);var i=Number(b.getAttribute('data-i'));if(st[i]){st[i].done=!st[i].done;updUndo('projects',id,{steps:st},st[i].done?'Mini-quête validée ✓':'Mini-quête décochée')}}}
-    else if(a==='proj-open'){iconOpen=false;projId=id;openId=null;confirmDel=null;renderSheet()}
+    else if(a==='proj-open'){iconOpen=false;projId=id;openId=null;confirmDel=null;qCal=null;renderSheet()}
     else if(a==='pmain'){it=find('projects',id);if(it){if(it.main)upd('projects',id,{main:false});
       else if(S.projects.filter(function(q){return q.main&&q.status!=='done'}).length>=3){toastMsg('Déjà 3 quêtes principales 📌 — retire-en une pour en épingler une autre');return}
       else upd('projects',id,{main:true});renderSheet()}}
@@ -1314,7 +1350,7 @@
       if(pv&&pq){upd('projects',id,{steps:steps(pq).concat([{t:pv,done:false}])})}
       projId=null;confirmDel=null;renderSheet()}
     else if(vClick(a,b,id)){}
-    else if(a==='sheet-close'){iconOpen=false;tEdit=null;tplMgr=false;tplEdit=null;bilPop=null;grpEdit=null;if(evEdit){evEdit=null;renderSheet();return}agOpen=false;evEdit=null;wishOpen=null;projId=null;openId=null;calFor=null;confirmDel=null;renderSheet()}
+    else if(a==='sheet-close'){iconOpen=false;tEdit=null;tplMgr=false;tplEdit=null;bilPop=null;grpEdit=null;qCal=null;if(evEdit){evEdit=null;renderSheet();return}agOpen=false;evEdit=null;wishOpen=null;projId=null;openId=null;calFor=null;confirmDel=null;renderSheet()}
     else if(a==='care-add'){var csec2=b.closest('section'),cf=csec2&&csec2.querySelector('form.care-add');if(cf){cf.hidden=!cf.hidden;if(!cf.hidden)cf.querySelector('input').focus()}}
     else if(a==='care-chk'){careToggle(id)}
     else if(a==='hub-go'){hubGo(b.getAttribute('data-v'))}
@@ -1457,8 +1493,6 @@
     else if(fld==='pstatus'||fld==='pprio'||fld==='pcat'){var pf=fld.slice(1),pv=t.value;
       if((pf==='prio'&&PRIO[pv])||(pf==='status'&&NEXT[pv])||(pf==='cat'&&QCATL[pv])){var po={};po[pf]=pv;if(pf==='status'&&pv==='done')updUndo('projects',id,po,'Quête terminée');else upd('projects',id,po)}}
     else if(fld==='name'){var sp=splitEmoji(t.value),rr=find('routines',id)||{};if(sp.title){var re_=sp.emoji||((rr.emoji&&!rr.autoIcon)?rr.emoji:autoEmoji(sp.title));upd('routines',id,{title:sp.title,emoji:re_,autoIcon:!sp.emoji&&!(rr.emoji&&!rr.autoIcon)})}}
-    else if(fld==='qfrom'){upd('projects',id,{qfrom:nDate(t.value)||null})}
-    else if(fld==='quntil'){upd('projects',id,{quntil:nDate(t.value)||null})}
     else if(fld==='everyUnit'){upd('routines',id,{everyUnit:t.value==='sem'?'sem':'j'})}
     else if(fld==='everyN'){var n=parseInt(t.value,10);upd('routines',id,{everyN:n>0&&n<1000?n:null})}
   });

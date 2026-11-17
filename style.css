@@ -1202,3 +1202,19 @@ body[data-tab="maison"] .addgrp{display:flex}
 .qpage .stepform{margin-top:10px;gap:8px}
 .qpage .stepform .in{padding:11px 14px;border-radius:15px;box-shadow:inset 0 0 0 1.5px rgba(141,123,240,.18)}
 .qpage .stepform .btn{padding:11px 18px}
+
+/* v89 : période d'une quête — un seul champ, un seul calendrier pour le début et la fin */
+.qdrow{display:flex;align-items:center;gap:6px}
+.qdbtn{flex:1;min-width:0;text-align:left;font-weight:800;color:var(--ink2);cursor:pointer;box-shadow:inset 0 0 0 1.5px rgba(141,123,240,.18)}
+.qdbtn.set{color:var(--ink)}
+.qdbtn.open{background:#fff;box-shadow:inset 0 0 0 1.5px var(--lav);color:var(--lav)}
+.qcal{margin-top:8px;background:#fff;box-shadow:inset 0 0 0 1.5px rgba(141,123,240,.18)}
+.qcal .cd{aspect-ratio:1;font-size:13px;border-radius:0}
+.qcal .cal-g{gap:2px 0}
+.qcal .cd:hover:not(.r0):not(.r1){background:var(--n-bg);border-radius:50%}
+.qcal .cd.rin{background:var(--lav-soft)}
+.qcal .cd.r0,.qcal .cd.r1{background:var(--lav);color:#fff}
+.qcal .cd.r0{border-radius:50% 0 0 50%}
+.qcal .cd.r1{border-radius:0 50% 50% 0}
+.qcal .cd.r0.only{border-radius:50%}
+.qcal .cd.today:not(.r0):not(.r1){box-shadow:inset 0 0 0 1.5px var(--lav);border-radius:50%}
