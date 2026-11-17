@@ -1154,3 +1154,33 @@ body[data-tab="maison"] .addgrp{display:flex}
 /* v84 : valise par sections */
 .steps .pk-g{list-style:none;display:flex;align-items:center;justify-content:space-between;margin-top:8px}
 .qc-when{font-size:12px;font-weight:800;color:var(--ink2);margin:-2px 0 2px 2px}
+
+/* v87 : la fiche d'une quête est une page à part, rangée comme un formulaire */
+.sheet.pagemode{padding:0;place-items:stretch}
+.sheet .sheet-card.page{width:100%;max-width:none;height:100%;max-height:none;border-radius:0;padding:0;box-shadow:none;
+  background:radial-gradient(560px 400px at 0% 0%,#EEE9FF 0,transparent 70%),radial-gradient(560px 420px at 100% 100%,#FFE9DD 0,transparent 70%),var(--bg)}
+.sheet-card.page .panel.qpage{max-width:620px;min-height:100%;margin:0 auto;padding:0 max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));gap:12px}
+.qp-head{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;padding:max(18px,env(safe-area-inset-top,0px)) 0 10px;background:var(--bg)}
+.sheet-card.page .sheet-x{position:static;flex:none;width:42px;height:42px;background:#fff;font-size:28px;padding:0 0 3px;box-shadow:0 4px 14px rgba(141,123,240,.18)}
+.qp-tt{font-size:22px;font-weight:900}
+.sheet-card.page .panel .ifield,.sheet-card.page .panel>.in{margin-right:0}
+.qp-box{display:flex;flex-direction:column;gap:10px;background:#fff;border-radius:22px;padding:14px;box-shadow:0 0 0 1.5px rgba(141,123,240,.12)}
+.sheet-card.page .steps{max-height:none;overflow:visible}
+.qp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px}
+.qp-f{display:flex;flex-direction:column;gap:5px;min-width:0}
+.qp-f.full{grid-column:1/-1}
+.qp-f .in{width:100%;min-width:0;margin:0;font-size:14px;font-weight:800}
+.qp-sw{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;font-weight:800;padding-top:2px}
+.sw{position:relative;flex:none;width:48px;height:28px;border:0;border-radius:999px;background:var(--n-bg);padding:0;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(60,40,140,.25);transition:transform .15s}
+.sw[aria-checked="true"]{background:var(--lav)}
+.sw[aria-checked="true"]::after{transform:translateX(20px)}
+.sheet-card.page .panel .in.notes{margin:0}
+.qp-foot{position:sticky;bottom:0;z-index:3;display:flex;gap:10px;margin-top:auto;padding:10px 0 max(14px,env(safe-area-inset-bottom,0px));background:var(--bg)}
+.sheet-card.page .qp-foot .btn{flex:1;padding:12px 14px;font-size:15px}
+.qp-foot .btn.del{color:#B3261E}
+.qp-head,.qp-foot{background-color:var(--bg);
+  background-image:radial-gradient(560px 400px at 0% 0%,#EEE9FF 0,transparent 70%),radial-gradient(560px 420px at 100% 100%,#FFE9DD 0,transparent 70%);
+  background-attachment:fixed;
+  margin-left:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1 * max(16px,env(safe-area-inset-right,0px)));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}

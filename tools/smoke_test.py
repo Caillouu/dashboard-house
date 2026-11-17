@@ -263,7 +263,7 @@ def main():
                     assert titles == ['Changer les rideaux'], titles
                     page.screenshot(path=f'{OUT}/{name}-quetes-filtre.png')
                     page.click('#qt-list .qv-list .qc-t'); page.wait_for_timeout(300)
-                    page.click('.sheet-card .seg.cat [data-v=date]'); page.wait_for_timeout(700)
+                    page.select_option('.sheet-card [data-field=pcat]', 'date'); page.wait_for_timeout(700)
                     assert '"cat": "date"' in [r for r in state['projects'] if r[0] == 'p4'][0][5].replace('":"', '": "'), state['projects']
                     page.click('.sheet-x'); page.wait_for_timeout(300)
                     assert 'Rien dans' in page.inner_text('#qt-list'), 'filtre Maison vide'
@@ -287,9 +287,17 @@ def main():
                 if name == 'mobile':
                     # jusqu'à 3 quêtes principales, pas une de plus
                     page.click('#qt-list .qv-list .qc-t >> text=Vin chaud'); page.wait_for_timeout(300)
+                    # la quête s'ouvre en page à part, avec des menus déroulants
+                    assert page.is_visible('.sheet-card.page .qp-head') and page.locator('.sheet-card.page select').count() == 3
+                    page.select_option('.sheet-card [data-field=pstatus]', 'doing'); page.wait_for_timeout(700)
+                    assert '"status": "doing"' in [r for r in state['projects'] if r[2] == 'Vin chaud'][0][5].replace('":"', '": "')
+                    page.select_option('.sheet-card [data-field=pstatus]', 'todo'); page.wait_for_timeout(700)
                     page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(700)
+                    assert page.get_attribute('.sheet-card .sw', 'aria-checked') == 'true', 'l\'interrupteur reste visible et coché'
+                    page.click('.sheet-x'); page.wait_for_timeout(300)
                     page.click('#qt-list .qv-list .qc-t >> text=Changer les rideaux'); page.wait_for_timeout(300)
                     page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(700)
+                    page.click('.sheet-x'); page.wait_for_timeout(300)
                     assert sum(1 for r in state['projects'] if r[3] == 'oui') == 3, state['projects']
                     assert page.locator('.qhero .qcard').count() == 3, 'trois quêtes principales en avant'
                     assert 'Quêtes principales' in page.inner_text('.qhero-h')
@@ -305,6 +313,7 @@ def main():
                     for t in ['Vin chaud', 'Changer les rideaux']:
                         page.click(f'.qhero .qc-t >> text={t}'); page.wait_for_timeout(300)
                         page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(700)
+                        page.click('.sheet-x'); page.wait_for_timeout(300)
                     assert sum(1 for r in state['projects'] if r[3] == 'oui') == 1, state['projects']
                     # période : pas encore commencée -> badge, absente de l'accueil
                     page.click('.qhero .qc-t >> text=Réparer robinet'); page.wait_for_timeout(300)
