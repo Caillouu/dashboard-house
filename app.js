@@ -666,7 +666,7 @@
   function qHead(o,fin,chk){
     var id=esc(o.id);
     return (qPaused(o)&&!fin?'<div class="qc-main qc-zz">💤 En pause</div>':o.main?'<div class="qc-main">📌 Quête principale</div>':'')+
-      '<div class="qc-h">'+(chk?'<button class="chk qc-chk'+(fin?' on':'')+'" data-act="pset" data-id="'+id+'" data-f="status" data-v="'+(fin?'todo':'done')+'" aria-label="'+(fin?'Rouvrir : ':'Terminer : ')+esc(o.title)+'">'+CHECK+'</button>':'')+'<span class="em" aria-hidden="true">'+esc(o.emoji||'✨')+'</span><button class="qc-t" data-act="proj-open" data-id="'+id+'">'+esc(o.title)+'</button>'+prioBtn(o)+'</div>'+
+      '<div class="qc-h"><span class="em" aria-hidden="true">'+esc(o.emoji||'✨')+'</span><button class="qc-t" data-act="proj-open" data-id="'+id+'">'+esc(o.title)+'</button>'+prioBtn(o)+(chk?'<button class="chk qc-chk'+(fin?' on':'')+'" data-act="pset" data-id="'+id+'" data-f="status" data-v="'+(fin?'todo':'done')+'" aria-label="'+(fin?'Rouvrir : ':'Terminer : ')+esc(o.title)+'">'+CHECK+'</button>':'')+'</div>'+
       (qPeriod(o)?'<div class="qc-when">'+qPeriod(o)+'</div>':'');
   }
   function qMini(o){
