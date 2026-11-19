@@ -1221,3 +1221,8 @@ body[data-tab="maison"] .addgrp{display:flex}
 .qcal .cd.r1{border-radius:0 50% 50% 0}
 .qcal .cd.r0.only{border-radius:50%}
 .qcal .cd.today:not(.r0):not(.r1){box-shadow:inset 0 0 0 1.5px var(--lav);border-radius:50%}
+
+/* v92 : une quête en pause est mise de côté, estompée dans la liste */
+.qcard.paused{opacity:.55}
+.qcard.paused:hover,.qcard.paused:focus-within{opacity:1}
+.qc-zz{color:var(--ink2)}

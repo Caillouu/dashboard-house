@@ -307,7 +307,21 @@ def main():
                     page.select_option('.sheet-card [data-field=pstatus]', 'todo'); page.wait_for_timeout(700)
                     page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(700)
                     assert page.get_attribute('.sheet-card .sw', 'aria-checked') == 'true', 'l\'interrupteur reste visible et coché'
-                    page.click('.sheet-x'); page.wait_for_timeout(300)
+                    # mise en pause depuis le détail : hors accueil, hors mise en avant, estompée dans la liste
+                    page.click('.sheet-card [data-act=ppause]'); page.wait_for_timeout(700)
+                    assert '"paused"' in [r for r in state['projects'] if r[2] == 'Vin chaud'][0][5], state['projects']
+                    page.click('.sheet-x'); page.wait_for_timeout(400)
+                    assert page.locator('.qhero .qc-t >> text=Vin chaud').count() == 0, 'une quête en pause quitte la mise en avant'
+                    zz = page.locator('#qt-list .qv-list .qcard.paused')
+                    assert zz.count() == 1 and 'Vin chaud' in zz.inner_text() and 'En pause' in zz.inner_text()
+                    assert page.eval_on_selector('#qt-list .qcard.paused', 'e => +getComputedStyle(e).opacity') < 1, 'carte estompée'
+                    page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(400)
+                    assert 'Vin chaud' not in page.inner_text('#l-main'), 'absente de l\'accueil'
+                    page.click('.h2btn'); page.wait_for_timeout(400)
+                    page.click('#qt-list .qv-list .qc-t >> text=Vin chaud'); page.wait_for_timeout(300)
+                    page.click('.sheet-card [data-act=ppause]'); page.wait_for_timeout(700)   # reprendre
+                    page.click('.sheet-x'); page.wait_for_timeout(400)
+                    assert page.locator('.qhero .qc-t >> text=Vin chaud').count() == 1, 'reprise : elle revient en avant'
                     page.click('#qt-list .qv-list .qc-t >> text=Changer les rideaux'); page.wait_for_timeout(300)
                     page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(700)
                     page.click('.sheet-x'); page.wait_for_timeout(300)
