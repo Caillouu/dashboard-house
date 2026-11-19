@@ -631,7 +631,11 @@
     var sel=function(f,lab,opts,cur,full){return '<label class="qp-f'+(full?' full':'')+'"><span class="lab">'+lab+'</span><select class="in" data-field="'+f+'" aria-label="'+lab+'">'+opts.map(function(x){return '<option value="'+x[0]+'"'+(cur===x[0]?' selected':'')+'>'+esc(x[1])+'</option>'}).join('')+'</select></label>'};
     var us=String(o.notes||'').match(/https?:\/\/[^\s<>"']+/g)||[];
     return '<div class="panel pj qpage" data-id="'+id+'">'+
-      '<header class="qp-head"><button class="sheet-x" type="button" data-act="sheet-close" aria-label="Retour">‹</button><span class="qp-tt">Quête</span></header>'+
+      '<header class="qp-head"><button class="sheet-x" type="button" data-act="sheet-close" aria-label="Retour">‹</button><span class="qp-tt">Quête</span>'+
+        '<button type="button" class="qpz'+(o.paused?' on':'')+'" data-act="ppause" data-id="'+id+'" aria-pressed="'+(!!o.paused)+'" aria-label="'+(o.paused?'Reprendre la quête':'Mettre la quête en pause')+'">'+
+          (o.paused?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6L19 12z"/></svg>'
+                   :'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="4" height="14" rx="1.4"/><rect x="13" y="5" width="4" height="14" rx="1.4"/></svg>')+
+          '<span>'+(o.paused?'En pause':'En cours')+'</span></button></header>'+
       iconField(o.emoji,'data-field="pname"',o.title,'Titre de la quête','data-act="ppick" data-id="'+id+'"',QEMO,o.emoji)+
       '<section class="qp-box"><div class="lab">Mini-quêtes'+(ss.length?' · '+done+'/'+ss.length:'')+'</div>'+
         (ss.length?'<div class="bar"><i style="width:'+pc+'%"></i></div>':'')+
@@ -645,8 +649,7 @@
           (o.qfrom||o.quntil?'<button type="button" class="sx" data-act="qdclear" data-id="'+id+'" aria-label="Effacer la période" title="Effacer">×</button>':'')+'</div>'+
           (qCal===o.id?qCalHtml(o):'')+'</div>'+
         '</div>'+
-        '<div class="qp-sw"><span>📌 Quête principale</span><button type="button" class="sw" role="switch" aria-checked="'+(!!o.main)+'" aria-label="Quête principale" data-act="pmain" data-id="'+id+'"></button></div>'+
-        '<div class="qp-sw"><span>💤 En pause</span><button type="button" class="sw" role="switch" aria-checked="'+(!!o.paused)+'" aria-label="En pause" data-act="ppause" data-id="'+id+'"></button></div></section>'+
+        '<div class="qp-sw"><span>📌 Quête principale</span><button type="button" class="sw" role="switch" aria-checked="'+(!!o.main)+'" aria-label="Quête principale" data-act="pmain" data-id="'+id+'"></button></div>'+'</section>'+
       '<section class="qp-box"><div class="lab">Liens et notes</div><textarea class="in notes" maxlength="2000" data-field="pnotes" rows="3" placeholder="" aria-label="Liens et notes">'+esc(o.notes||'')+'</textarea>'+
         (us.length?'<div class="nlinks">'+us.map(function(u){return '<a class="btn ghost" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer">↗ '+esc(u.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])+'</a>'}).join('')+'</div>':'')+'</section>'+
       '<footer class="qp-foot"><button class="btn ghost del" data-act="pdel" data-id="'+id+'">Supprimer</button><button class="btn valid" data-act="proj-save" data-id="'+id+'">Valider</button></footer></div>';

@@ -1226,3 +1226,11 @@ body[data-tab="maison"] .addgrp{display:flex}
 .qcard.paused{opacity:.55}
 .qcard.paused:hover,.qcard.paused:focus-within{opacity:1}
 .qc-zz{color:var(--ink2)}
+
+/* v93 : la pause d'une quête est un bouton en haut à droite de sa page, pas un réglage */
+.qpz{display:flex;align-items:center;gap:7px;margin-left:auto;flex:none;border:0;cursor:pointer;
+  padding:7px 13px 7px 10px;border-radius:999px;font:inherit;font-size:13px;font-weight:800;
+  background:#fff;color:var(--ink2);box-shadow:0 4px 14px rgba(141,123,240,.18)}
+.qpz svg{width:15px;height:15px;fill:currentColor;flex:none}
+.qpz.on{background:var(--lav);color:#fff;box-shadow:0 4px 14px rgba(141,123,240,.4)}
+@media (max-width:360px){.qpz span{display:none}.qpz{padding:9px}}

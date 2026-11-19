@@ -308,8 +308,11 @@ def main():
                     page.click('.sheet-card [data-act=pmain]'); page.wait_for_timeout(700)
                     assert page.get_attribute('.sheet-card .sw', 'aria-checked') == 'true', 'l\'interrupteur reste visible et coché'
                     # mise en pause depuis le détail : hors accueil, hors mise en avant, estompée dans la liste
-                    page.click('.sheet-card [data-act=ppause]'); page.wait_for_timeout(700)
+                    assert page.inner_text('.sheet-card .qp-head .qpz') == 'En cours', 'bouton pause en haut à droite'
+                    page.click('.sheet-card .qp-head .qpz'); page.wait_for_timeout(700)
                     assert '"paused"' in [r for r in state['projects'] if r[2] == 'Vin chaud'][0][5], state['projects']
+                    assert page.inner_text('.sheet-card .qp-head .qpz') == 'En pause', 'le bouton devient Reprendre'
+                    assert page.locator('.sheet-card .qp-sw').count() == 1, 'la pause n\'est plus dans les réglages'
                     page.click('.sheet-x'); page.wait_for_timeout(400)
                     assert page.locator('.qhero .qc-t >> text=Vin chaud').count() == 0, 'une quête en pause quitte la mise en avant'
                     zz = page.locator('#qt-list .qv-list .qcard.paused')
@@ -319,7 +322,7 @@ def main():
                     assert 'Vin chaud' not in page.inner_text('#l-main'), 'absente de l\'accueil'
                     page.click('.h2btn'); page.wait_for_timeout(400)
                     page.click('#qt-list .qv-list .qc-t >> text=Vin chaud'); page.wait_for_timeout(300)
-                    page.click('.sheet-card [data-act=ppause]'); page.wait_for_timeout(700)   # reprendre
+                    page.click('.sheet-card .qp-head .qpz'); page.wait_for_timeout(700)   # reprendre
                     page.click('.sheet-x'); page.wait_for_timeout(400)
                     assert page.locator('.qhero .qc-t >> text=Vin chaud').count() == 1, 'reprise : elle revient en avant'
                     page.click('#qt-list .qv-list .qc-t >> text=Changer les rideaux'); page.wait_for_timeout(300)
