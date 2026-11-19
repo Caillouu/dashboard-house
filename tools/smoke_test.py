@@ -73,6 +73,19 @@ def handle(route):
     route.fulfill(status=200, content_type='application/json', body=json.dumps(r))
 
 
+class _Scope:
+    """Donne à _pick un calendrier ailleurs que dans la fiche (ex. la page d'un voyage)."""
+    act = 'vcal'
+    def __init__(self, page, root): self._p, self._r = page, root
+    def locator(self, sel): return self._p.locator(sel.replace('.sheet-card', self._r))
+    def click(self, sel, **kw): return self._p.click(sel.replace('.sheet-card', self._r), **kw)
+    def get_attribute(self, sel, name): return self._p.get_attribute(sel.replace('.sheet-card', self._r), name)
+    def wait_for_timeout(self, ms): return self._p.wait_for_timeout(ms)
+
+
+def _vcal(page): return _Scope(page, '#vv-body')
+
+
 def _pick(page, day):
     """Clique le jour `day` (AAAA-MM-JJ) dans le calendrier de période, en naviguant au bon mois."""
     want = int(day[:4]) * 12 + int(day[5:7])
@@ -82,7 +95,8 @@ def _pick(page, day):
             cell.click(); return
         shown = page.get_attribute('.sheet-card .qcal [data-date]', 'data-date')
         cur = int(shown[:4]) * 12 + int(shown[5:7])
-        page.click('.sheet-card [data-act=qcal-%s]' % ('next' if want > cur else 'prev')); page.wait_for_timeout(120)
+        act = getattr(page, 'act', 'qcal')
+        page.click('.sheet-card [data-act=%s-%s]' % (act, 'next' if want > cur else 'prev')); page.wait_for_timeout(120)
     raise AssertionError(f'jour {day} introuvable dans le calendrier')
 
 
@@ -407,8 +421,18 @@ def main():
                 assert page.input_value('[data-trip=startT]') == '08:35'
                 page.screenshot(path=f'{OUT}/{name}-voyage.png')
                 if name == 'mobile':
+                    # départ et retour dans le même calendrier
+                    assert page.locator('[data-trip=startD]').count() == 0, 'plus de champs date séparés'
+                    page.click('#vv-body [data-act=vcal]'); page.wait_for_timeout(300)
+                    _pick(_vcal(page), _d(9)); page.wait_for_timeout(700)
+                    assert [r for r in state['voyages'] if r[0] == 'v1'][0][4].startswith(_d(9)), state['voyages'][0]
+                    assert page.is_visible('#vv-body .qcal'), 'le calendrier reste ouvert pour le retour'
+                    _pick(_vcal(page), _d(12)); page.wait_for_timeout(700)
+                    assert [r for r in state['voyages'] if r[0] == 'v1'][0][5].startswith(_d(12)), state['voyages'][0]
+                    assert not page.is_visible('#vv-body .qcal'), 'le calendrier se referme une fois le retour choisi'
+                    assert '→' in page.inner_text('#vv-body .qdbtn')
                     page.fill('[data-trip=endT]', '19:05'); page.locator('[data-trip=endT]').dispatch_event('change'); page.wait_for_timeout(800)
-                    assert [r for r in state['voyages'] if r[0] == 'v1'][0][5] == _d(7) + ' 19:05', state['voyages'][0]
+                    assert [r for r in state['voyages'] if r[0] == 'v1'][0][5] == _d(12) + ' 19:05', state['voyages'][0]
                     page.click('#vv-bil'); page.wait_for_timeout(200)
                     assert 'aucun lien' in page.inner_text('.sheet-card'), page.inner_text('.sheet-card')
                     page.fill('.sheet-card [data-bil]', 'https://www.sncf-connect.com/'); page.keyboard.press('Enter'); page.wait_for_timeout(800)
@@ -458,7 +482,10 @@ def main():
                     page.click('.sheet-x'); page.wait_for_timeout(200)
                     page.click('[data-act=vview-close]'); page.wait_for_timeout(300)
                     page.click('[data-act=trip-new]'); page.wait_for_timeout(500)
-                    page.fill('[data-trip=title]', 'Rome'); page.fill('[data-trip=startD]', _d(20)); page.fill('[data-trip=startT]', '07:15')
+                    page.fill('[data-trip=title]', 'Rome')
+                    page.click('#vv-body [data-act=vcal]'); page.wait_for_timeout(300)
+                    _pick(_vcal(page), _d(20)); page.wait_for_timeout(600)   # la date d'abord, l'heure ensuite
+                    page.fill('[data-trip=startT]', '07:15'); page.locator('[data-trip=startT]').dispatch_event('change'); page.wait_for_timeout(600)
                     page.screenshot(path=f'{OUT}/{name}-voyage-nouveau.png')
                     page.click('[data-act=trip-ok]'); page.wait_for_timeout(900)
                     assert not page.is_visible('#vview'), 'Valider ne referme pas la page'

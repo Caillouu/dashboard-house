@@ -589,8 +589,8 @@ body{background-repeat:no-repeat}
 .ttile.past{background:var(--n-bg)}
 .tt-em,.tn-n,.tn-em,.vinfo .ibtn{background:var(--lav-soft)}
 .tt-b,.tn-n,.tn-n b{color:var(--lav)}.tt-b{background:var(--lav-soft)}
-.th-k,.tn-s,.vi-dt span,.vcd-sub,.fg small{color:var(--ink2)}
-.vi-title,.vi-dt .in,.vi-link .in{background:var(--n-bg)}
+.th-k,.tn-s,.vi-dt span,.vi-hr span,.vcd-sub,.fg small{color:var(--ink2)}
+.vi-title,.vi-dt .in,.vi-hr .in,.vi-link .in{background:var(--n-bg)}
 .fd i{background:var(--n-bg);box-shadow:inset 0 0 0 1px rgba(141,123,240,.12)}
 .fd i::after{background:rgba(141,123,240,.16)}
 .fd b{color:var(--lav)}
@@ -1246,3 +1246,12 @@ body[data-tab="maison"] .addgrp{display:flex}
 .qc-more{flex:none;font-size:12px;font-weight:900;color:var(--ink2);opacity:.75}
 .qc-chk{flex:none;width:24px;height:24px}
 .qc-chk.on{background:var(--lav);border-color:var(--lav);color:#fff}
+
+/* v97 : dates d'un voyage — un seul calendrier aller-retour, puis les deux heures */
+.vinfo .qdrow{margin-top:2px}
+.vinfo .qdbtn{background:rgba(255,255,255,.85);min-height:42px}
+.vi-hrs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.vi-hr{display:flex;flex-direction:column;gap:5px;min-width:0}
+.vi-hr span{font-size:12px;font-weight:900;color:var(--o-ink);text-transform:uppercase;letter-spacing:.04em}
+.vi-hr .in{width:100%;min-width:0;background:rgba(255,255,255,.85);border-radius:12px;-webkit-appearance:none;appearance:none;min-height:40px;padding:6px 8px}
+.vinfo .cal{background:rgba(255,255,255,.85)}

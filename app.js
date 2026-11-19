@@ -261,22 +261,25 @@
     if(b)return '→ '+fmtDay(b,{day:'numeric',month:'short'});
     return '';
   }
-  function qCalHtml(o){
-    var m=qCalM,y=m.getFullYear(),mo=m.getMonth(),id=esc(o.id);
-    var startDow=(new Date(y,mo,1).getDay()+6)%7,days=new Date(y,mo+1,0).getDate(),today=iso(new Date()),a=o.qfrom||'',b=o.quntil||'';
-    var h='<div class="cal qcal"><div class="cal-h"><button type="button" class="lnk" data-act="qcal-prev" aria-label="Mois précédent">‹</button><b>'+esc(cap(m.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})))+'</b><button type="button" class="lnk" data-act="qcal-next" aria-label="Mois suivant">›</button></div><div class="cal-g">';
+  /* Calendrier de période, partagé par les quêtes et les voyages : on touche le premier
+     jour, puis un second plus tard pour la fin. `act` préfixe les gestes (qcal, vcal). */
+  function rangeCal(a,b,m,act,id){
+    var y=m.getFullYear(),mo=m.getMonth(),startDow=(new Date(y,mo,1).getDay()+6)%7,days=new Date(y,mo+1,0).getDate(),today=iso(new Date());
+    a=a||'';b=b||'';id=esc(id);
+    var h='<div class="cal qcal"><div class="cal-h"><button type="button" class="lnk" data-act="'+act+'-prev" aria-label="Mois précédent">‹</button><b>'+esc(cap(m.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})))+'</b><button type="button" class="lnk" data-act="'+act+'-next" aria-label="Mois suivant">›</button></div><div class="cal-g">';
     ['L','M','M','J','V','S','D'].forEach(function(d){h+='<i>'+d+'</i>'});
     for(var k=0;k<startDow;k++)h+='<span></span>';
     for(var d=1;d<=days;d++){
       var di=y+'-'+pad(mo+1)+'-'+pad(d),c='cd';
-      if(di===a)c+=' r0'+(b?'':' only');
+      if(di===a)c+=' r0'+(b&&b!==a?'':' only');
       else if(di===b)c+=' r1';
       else if(a&&b&&di>a&&di<b)c+=' rin';
       if(di===today)c+=' today';
-      h+='<button type="button" class="'+c+'" data-act="qcal-pick" data-id="'+id+'" data-date="'+di+'">'+d+'</button>';
+      h+='<button type="button" class="'+c+'" data-act="'+act+'-pick" data-id="'+id+'" data-date="'+di+'">'+d+'</button>';
     }
     return h+'</div></div>';
   }
+  function qCalHtml(o){return rangeCal(o.qfrom,o.quntil,qCalM,'qcal',o.id)}
   function calHtml(r){
     var m=calMonth,y=m.getFullYear(),mo=m.getMonth();
     var startDow=(new Date(y,mo,1).getDay()+6)%7,days=new Date(y,mo+1,0).getDate(),today=iso(new Date()),sel=r.lastDone||'';
@@ -354,7 +357,7 @@
   }
   /* La fiche est redessinée souvent (sauvegarde, rafraîchissement…). Si le contenu est identique,
      on ne remplace rien : sinon le DOM change sous le doigt et le tout premier appui est perdu. */
-  var sheetGuard=false,sheetPressed=false;
+  var sheetGuard=false,sheetPressed=false,vPressed=false;
   function guardSheet(){
     if(sheetGuard)return;var el=$('sheet');if(!el||!Object.getOwnPropertyDescriptor)return;
     var d=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');if(!d||!d.set)return;
@@ -1067,11 +1070,15 @@
       '<div class="vt-row"><input class="in" id="vt-in" maxlength="120" autocomplete="off" placeholder="Ajouter…" aria-label="Nouveau truc à faire"><button class="btn">OK</button></div></form>';
     return h+'</section>'}
   function vMain(t){var h='';
-    var dt=function(lab,p,v){return '<div class="vi-dt"><span>'+lab+'</span><input class="in" type="date" data-trip="'+p+'D" value="'+esc(dPart(v))+'" aria-label="'+lab+' : jour"><input class="in" type="time" data-trip="'+p+'T" value="'+esc(hPart(v))+'" aria-label="'+lab+' : heure"></div>'};
+    var sD=dPart(t.start),eD=dPart(t.end);
+    var dtxt=sD&&eD?fmtDay(sD,{day:'numeric',month:'short'})+' → '+fmtDay(eD,{day:'numeric',month:'short'}):sD?fmtDay(sD,{day:'numeric',month:'short'}):'';
+    var hr=function(lab,p,v){return '<label class="vi-hr"><span>'+lab+'</span><input class="in" type="time" data-trip="'+p+'T" value="'+esc(hPart(v))+'" aria-label="'+lab+' : heure"></label>'};
     h+='<section class="vinfo"><div class="vi-row"><button type="button" class="ibtn'+(vEmoOpen?' open':'')+'" data-act="trip-emo-tog" aria-label="Changer l\'icône">'+esc(tEmo(t))+'</button>'+
       '<input class="in vi-title" maxlength="80" data-trip="title" value="'+esc(t.title)+'" aria-label="Destination" placeholder="Destination"></div>'+
       (vEmoOpen?'<div class="emos pop">'+TRIPEMO.map(function(e){return '<button type="button" class="emo'+(t.emoji===e?' on':'')+'" data-act="trip-emo" data-e="'+e+'" aria-label="Icône '+e+'">'+e+'</button>'}).join('')+'</div>':'')+
-      dt('🚆 Départ','start',t.start)+dt('🏠 Retour','end',t.end)+
+      '<div class="qdrow"><button type="button" class="in qdbtn'+(vCal?' open':'')+(dtxt?' set':'')+'" data-act="vcal" data-id="'+esc(t.id)+'" aria-expanded="'+!!vCal+'">'+(dtxt||'Choisir les dates')+'</button></div>'+
+      (vCal?rangeCal(sD,eD,vCalM,'vcal',t.id):'')+
+      '<div class="vi-hrs">'+hr('🚆 Départ','start',t.start)+hr('🏠 Retour','end',t.end)+'</div>'+
       '</section>';
     var H=kids(t.id,'logement').sort(byStart);
     h+=vSecH('🛏️','Hébergement','logement')+(H.length?H.map(vStay).join(''):'<p class="vempty">Pas encore d\'hébergement.</p>');
@@ -1082,6 +1089,8 @@
     return h}
   function renderVView(){if(!vOpen)return;var B=$('vv-body');if(!B)return;
     var ae=document.activeElement,t=find('voyages',vOpen);
+    /* un doigt est posé sur la page : la reconstruire maintenant avalerait l'appui */
+    if(vPressed&&!vForce)return;
     if(vSkip||ae&&$('vview').contains(ae)&&((ae.tagName==='INPUT'||ae.tagName==='SELECT')&&ae.value||ae.hasAttribute('data-trip'))){if(t)$('vv-title').textContent=tEmo(t)+' '+t.title;return}
     if(!t||t.type!=='voyage'){if(loaded.voyages&&!fromCache)vview(null,true);else B.innerHTML='<p class="empty">Chargement…</p>';return}
     var st=tripState(t);
@@ -1098,6 +1107,9 @@
     clearTimeout(toastT);toastT=setTimeout(function(){lastMulti=null;hideToast()},8000)}
   /* Champs du voyage : enregistrés sans redessiner la page, pour ne pas perdre le champ suivant en cours de saisie */
   var vSkip=false;
+  var vCal=false,vCalM=null,vCalStep=0;   /* 1 = on attend le jour du retour */
+  var vForce=false;
+  function vPaint(){vForce=true;try{renderVView()}finally{vForce=false}}
   function tripField(f,v){vSkip=true;try{tripField_(f,v)}finally{vSkip=false}}
   function tripField_(f,v){var t=vOpen&&find('voyages',vOpen);if(!t)return;
     if(f==='title'){var sp=splitEmoji(v);if(!sp.title){renderVView();return}var d={title:sp.title};if(sp.emoji)d.emoji=sp.emoji;upd('voyages',t.id,d);return}
@@ -1174,7 +1186,7 @@
       vNew=nid;vEmoOpen=false;vDelConfirm=false;vBilEdit=false;setTab('voyage');vview(nid,true);
       setTimeout(function(){var ti=document.querySelector('#vv-body [data-trip="title"]');if(ti){ti.focus();ti.select()}},60)}
     else if(a==='trips-past'){showPast=!showPast;renderTrips()}
-    else if(a==='vview-close'){vview(null,true)}
+    else if(a==='vview-close'){vCal=false;vCalStep=0;vview(null,true)}
     else if(a==='trip-ok'){var tt=vOpen&&find('voyages',vOpen);if(tt){
         [].forEach.call(document.querySelectorAll('#vv-body [data-trip]'),function(inp){var f=inp.getAttribute('data-trip'),cur=f==='title'?tt.title:f==='startD'?dPart(tt.start):f==='startT'?hPart(tt.start):f==='endD'?dPart(tt.end):f==='endT'?hPart(tt.end):null;
           if(cur!==null&&inp.value!==cur){tt=find('voyages',vOpen);tripField(f,inp.value)}});
@@ -1330,6 +1342,15 @@
       document.body.appendChild(m);var r=b.getBoundingClientRect(),w=m.offsetWidth,h=m.offsetHeight,x=Math.min(window.innerWidth-w-8,Math.max(8,r.right-w)),y=r.bottom+6;if(y+h>window.innerHeight-8)y=r.top-h-6;
       m.style.left=x+'px';m.style.top=y+'px';var f0=m.querySelector('.on');if(f0)f0.focus({preventScroll:true});return}
     if(a==='pset'){var f=b.getAttribute('data-f'),v=b.getAttribute('data-v');if((f==='prio'&&PRIO[v])||(f==='status'&&NEXT[v])||(f==='cat'&&QCATL[v])){var o2={};o2[f]=v;if(f==='status'&&v==='done')updUndo('projects',id,o2,'Quête terminée');else upd('projects',id,o2)}}
+    else if(a==='vcal'){var vt=vOpen&&find('voyages',vOpen);if(vCal)vCal=false;else{vCal=true;vCalStep=0;var vb=vt&&dPart(vt.start)?parse(dPart(vt.start)):new Date();vCalM=new Date(vb.getFullYear(),vb.getMonth(),1)}vPaint()}
+    else if(a==='vcal-prev'){vCalM=new Date(vCalM.getFullYear(),vCalM.getMonth()-1,1);vPaint()}
+    else if(a==='vcal-next'){vCalM=new Date(vCalM.getFullYear(),vCalM.getMonth()+1,1);vPaint()}
+    else if(a==='vcal-pick'){var vd=b.getAttribute('data-date'),vtr=vOpen&&find('voyages',vOpen);if(vtr){
+      var vs=dPart(vtr.start);
+      /* enregistrer le départ cale aussi le retour sur ce jour : on suit donc l'étape nous-mêmes */
+      if(vCalStep===1&&vs&&vd>=vs){vCal=false;vCalStep=0;tripField('endD',vd)}   /* second jour : le retour */
+      else{vCalStep=1;tripField('startD',vd)}                                     /* premier jour : le départ */
+      vPaint()}}
     else if(a==='qcal'){if(qCal===id)qCal=null;else{qCal=id;var qo=find('projects',id),qb=qo&&qo.qfrom?parse(qo.qfrom):new Date();qCalM=new Date(qb.getFullYear(),qb.getMonth(),1)}renderSheet()}
     else if(a==='qcal-prev'){qCalM=new Date(qCalM.getFullYear(),qCalM.getMonth()-1,1);renderSheet()}
     else if(a==='qcal-next'){qCalM=new Date(qCalM.getFullYear(),qCalM.getMonth()+1,1);renderSheet()}
@@ -1527,8 +1548,8 @@
   document.addEventListener('focusout',function(e){var t=e.target;if(t&&t.hasAttribute&&t.hasAttribute('data-stepedit'))stepRenEnd(t,true,true)});
   /* Quand on quitte un champ de la fiche, on la redessine — sauf si le doigt vient d'appuyer
      sur un bouton de cette fiche : sinon le redessin avale le tout premier appui (croix, Valider…). */
-  document.addEventListener('pointerdown',function(e){var t=e.target;if(t&&t.closest&&t.closest('.sheet-card'))sheetPressed=true},true);
-  ['pointerup','pointercancel'].forEach(function(ev){document.addEventListener(ev,function(){if(!sheetPressed)return;sheetPressed=false;setTimeout(function(){renderSheet(true)},150)},true)});
+  document.addEventListener('pointerdown',function(e){var t=e.target;if(!t||!t.closest)return;if(t.closest('.sheet-card'))sheetPressed=true;if(t.closest('#vv-body'))vPressed=true},true);
+  ['pointerup','pointercancel'].forEach(function(ev){document.addEventListener(ev,function(){if(vPressed){vPressed=false;setTimeout(renderVView,150)}if(!sheetPressed)return;sheetPressed=false;setTimeout(function(){renderSheet(true)},150)},true)});
   document.addEventListener('focusout',function(e){
     var t=e.target;if(t&&t.closest&&t.closest('.sheet-card'))setTimeout(function(){renderSheet(true)},80);
   });
