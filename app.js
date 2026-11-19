@@ -453,6 +453,8 @@
   function qExpired(o){return !!(o.quntil&&iso(new Date())>o.quntil)}
   function qPeriod(o){if(o.qfrom&&!qStarted(o))return '⏳ à partir du '+fmtDay(o.qfrom);if(o.quntil&&!qExpired(o))return '📅 jusqu\'au '+fmtDay(o.quntil);return ''}
   function qPaused(o){return !!o.paused}
+  /* mise de côté : en pause, ou dont la date de début n'est pas encore arrivée */
+  function qIdle(o){return qPaused(o)||!qStarted(o)}
   function mains3(){return S.projects.filter(function(p){return p.main&&p.status!=='done'&&!qPaused(p)&&qStarted(p)&&!qExpired(p)}).slice(0,3)}
   function dueList(){var R={r:0,o:1};return S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue).sort(function(a,b){return R[a.st.c]-R[b.st.c]})}
   /* Kimchi réagit au moment, à la météo et au voyage — pas aux choses à faire (elles sont juste en dessous) */
@@ -661,7 +663,7 @@
     var fin=o.status==='done'||(ss.length&&done===ss.length)||qExpired(o),p=PRIO[o.prio]?o.prio:'med',st=o.status||'todo';
     var us=String(o.notes||'').match(/https?:\/\/[^\s<>"']+/g)||[];
     var note=String(o.notes||'').replace(/https?:\/\/[^\s<>"']+/g,'').trim();
-    return '<article class="qcard'+(fin?' done':'')+(o.main?' main':'')+(qPaused(o)&&!fin?' paused':'')+'">'+
+    return '<article class="qcard'+(fin?' done':'')+(o.main?' main':'')+(qIdle(o)&&!fin?' idle':'')+'">'+
       (qPaused(o)&&!fin?'<div class="qc-main qc-zz">💤 En pause</div>':o.main?'<div class="qc-main">📌 Quête principale</div>':'')+
       '<div class="qc-h"><span class="em" aria-hidden="true">'+esc(o.emoji||'✨')+'</span><button class="qc-t" data-act="proj-open" data-id="'+id+'">'+esc(o.title)+'</button>'+'<button class="qc-pin'+(o.main?' on':'')+'" data-act="pmain" data-id="'+id+'" aria-pressed="'+!!o.main+'" aria-label="'+(o.main?'Retirer de la quête principale':'Mettre en quête principale')+'" title="'+(o.main?'Retirer de la quête principale':'Mettre en quête principale')+'">📌</button>'+
       prioBtn(o)+'</div>'+
@@ -689,9 +691,9 @@
     if(ae&&ae.matches&&ae.matches('#qtab select.pr'))return;
     var isFin=function(o){var ss=o.steps||[];return o.status==='done'||qExpired(o)||(ss.length&&ss.every(function(x){return x.done}))};
     var srt=function(a,b){var sa=a.status==='doing'?0:1,sb=b.status==='doing'?0:1;if(sa!==sb)return sa-sb;var q=(PW[b.prio]||2)-(PW[a.prio]||2);if(q)return q;return (a.createdAt||0)-(b.createdAt||0)};
-    var MQ=S.projects.filter(function(o){return o.main&&!isFin(o)&&!qPaused(o)}).slice(0,3);
+    var MQ=S.projects.filter(function(o){return o.main&&!isFin(o)&&!qIdle(o)}).slice(0,3);
     var inCat=function(o){return qtCat==='all'||qCat(o)===qtCat};
-    var all=S.projects.filter(function(o){return !isFin(o)&&MQ.indexOf(o)<0}),act=all.filter(inCat).sort(srt).sort(function(a,b){return (qPaused(a)?1:0)-(qPaused(b)?1:0)}),fin=S.projects.filter(isFin).filter(inCat).sort(srt);
+    var all=S.projects.filter(function(o){return !isFin(o)&&MQ.indexOf(o)<0}),act=all.filter(inCat).sort(srt).sort(function(a,b){return (qIdle(a)?1:0)-(qIdle(b)?1:0)}),fin=S.projects.filter(isFin).filter(inCat).sort(srt);
     var chips='<div class="qfil" role="tablist" aria-label="Filtrer les quêtes">'+[['all','🗂️','Toutes']].concat(QCATS).map(function(c){return '<button type="button" role="tab" class="qf'+(qtCat===c[0]?' on':'')+'" aria-selected="'+(qtCat===c[0])+'" data-act="qt-cat" data-v="'+c[0]+'">'+(c[1]?'<span aria-hidden="true">'+c[1]+'</span>':'')+c[2]+'</button>'}).join('')+'</div>';
     var cl=QCATL[qtCat],emptyTxt=qtCat==='all'?'Aucune autre quête. Une idée ? Ajoute-la avec « + Nouvelle ».':'Rien dans '+cl[1]+' '+cl[2]+' pour l\'instant.';
     var hero=MQ.length?'<div class="qhero"><div class="qhero-h"><span>📌 Quête'+(MQ.length>1?'s':'')+' principale'+(MQ.length>1?'s':'')+'</span><img src="assets/kimchi-anim.svg" alt=""></div>'+MQ.map(qCard).join('')+'</div>'
@@ -1326,7 +1328,7 @@
     else if(a==='ps'){it=find('projects',id);if(it){var st=steps(it);var i=Number(b.getAttribute('data-i'));if(st[i]){st[i].done=!st[i].done;updUndo('projects',id,{steps:st},st[i].done?'Mini-quête validée ✓':'Mini-quête décochée')}}}
     else if(a==='proj-open'){iconOpen=false;projId=id;openId=null;confirmDel=null;qCal=null;renderSheet()}
     else if(a==='pmain'){it=find('projects',id);if(it){if(it.main)upd('projects',id,{main:false});
-      else if(S.projects.filter(function(q){return q.main&&q.status!=='done'&&!qPaused(q)}).length>=3){toastMsg('Déjà 3 quêtes principales 📌 — retire-en une pour en épingler une autre');return}
+      else if(S.projects.filter(function(q){return q.main&&q.status!=='done'&&!qIdle(q)}).length>=3){toastMsg('Déjà 3 quêtes principales 📌 — retire-en une pour en épingler une autre');return}
       else upd('projects',id,{main:true});renderSheet()}}
     else if(a==='ppause'){it=find('projects',id);if(it){upd('projects',id,{paused:it.paused?null:true});renderSheet()}}
     else if(a==='main-finish'){updUndo('projects',id,{main:false,status:'done'},'Quête accomplie 🎉')}

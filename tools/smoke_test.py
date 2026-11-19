@@ -315,9 +315,9 @@ def main():
                     assert page.locator('.sheet-card .qp-sw').count() == 1, 'la pause n\'est plus dans les réglages'
                     page.click('.sheet-x'); page.wait_for_timeout(400)
                     assert page.locator('.qhero .qc-t >> text=Vin chaud').count() == 0, 'une quête en pause quitte la mise en avant'
-                    zz = page.locator('#qt-list .qv-list .qcard.paused')
+                    zz = page.locator('#qt-list .qv-list .qcard.idle')
                     assert zz.count() == 1 and 'Vin chaud' in zz.inner_text() and 'En pause' in zz.inner_text()
-                    assert page.eval_on_selector('#qt-list .qcard.paused', 'e => +getComputedStyle(e).opacity') < 1, 'carte estompée'
+                    assert page.eval_on_selector('#qt-list .qcard.idle', 'e => +getComputedStyle(e).opacity') < 1, 'carte estompée'
                     page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(400)
                     assert 'Vin chaud' not in page.inner_text('#l-main'), 'absente de l\'accueil'
                     page.click('.h2btn'); page.wait_for_timeout(400)
@@ -367,12 +367,15 @@ def main():
                     _pick(page, _d(5)); page.wait_for_timeout(700)
                     assert '"qfrom"' in state['projects'][0][5], state['projects'][0]
                     page.click('.sheet-x'); page.wait_for_timeout(300)
-                    assert 'à partir du' in page.inner_text('.qhero'), 'badge « à partir du »'
+                    assert page.locator('.qhero .qc-t >> text=Réparer robinet').count() == 0, 'pas encore commencée : quitte la mise en avant'
+                    idle = page.locator('#qt-list .qv-list .qcard.idle >> nth=0')
+                    assert 'Réparer robinet' in idle.inner_text() and 'à partir du' in idle.inner_text(), idle.inner_text()
+                    assert page.eval_on_selector('#qt-list .qcard.idle', 'e => +getComputedStyle(e).opacity') < 1, 'estompée comme une quête en pause'
                     page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(400)
                     assert page.locator('#l-main .tq:not(.tq-none)').count() == 0, 'pas encore commencée : pas sur l\'accueil'
                     page.click('.h2btn'); page.wait_for_timeout(400)
                     # période : terminée hier -> la quête est considérée comme faite
-                    page.click('.qhero .qc-t >> text=Réparer robinet'); page.wait_for_timeout(300)
+                    page.click('#qt-list .qv-list .qc-t >> text=Réparer robinet'); page.wait_for_timeout(300)
                     page.click('.sheet-card [data-act=qdclear]'); page.wait_for_timeout(600)
                     page.click('.sheet-card [data-act=qcal]'); page.wait_for_timeout(300)
                     _pick(page, _d(-3)); page.wait_for_timeout(600)
