@@ -1146,6 +1146,9 @@ body[data-tab="home"][data-view="simple"] .sc-txt h2{font-size:17px}
 .qdates .in{flex:none;width:auto;padding:4px 8px}
 /* v84 : sections de routines personnalisées */
 .cgroups{display:contents}
+/* sur le tableau de bord (12 colonnes), une section personnalisée prend la même place
+   que Kimchi, Plantes ou Maison : sans ça elle tombait sur une seule colonne */
+body[data-tab="home"] .cgroups>.cgrp{grid-column:span 3}
 body[data-tab="courses"] .cgroups,body[data-tab="voyage"] .cgroups{display:none}
 .gic{font-size:13px;display:flex;align-items:center;justify-content:center}
 .gedit{margin-right:6px}
@@ -1234,3 +1237,12 @@ body[data-tab="maison"] .addgrp{display:flex}
 .qpz svg{width:15px;height:15px;fill:currentColor;flex:none}
 .qpz.on{background:var(--lav);color:#fff;box-shadow:0 4px 14px rgba(141,123,240,.4)}
 @media (max-width:360px){.qpz span{display:none}.qpz{padding:9px}}
+
+/* v95 : carte de quête compacte dans les listes — on voit et on coche, on règle dans la page */
+.qcard.compact{gap:8px;padding:14px 16px}
+.qcard.compact .qc-prog{gap:8px}
+.qcard.compact .steps{gap:0;margin:0}
+.qcard.compact .step{padding:0;font-size:14px}
+.qc-more{flex:none;font-size:12px;font-weight:900;color:var(--ink2);opacity:.75}
+.qc-chk{flex:none;width:24px;height:24px}
+.qc-chk.on{background:var(--lav);border-color:var(--lav);color:#fff}

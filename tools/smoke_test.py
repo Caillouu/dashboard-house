@@ -294,7 +294,10 @@ def main():
                     assert not page.is_visible('#prm')
                     assert card.locator('.prb').inner_text() == '🔥'
                     assert page.locator('#qt-list .seg.status').count() == 0, 'plus de sélecteur de statut dans les cartes'
-                    card.locator('.qc-end').click(); page.wait_for_timeout(700)
+                    # carte compacte : pas d'éditeur, le rond termine une quête sans étape
+                    assert card.locator('.stepform').count() == 0 and card.locator('.qc-f').count() == 0, 'carte compacte'
+                    assert page.locator('#qt-list .qv-list .qc-pin').count() == 0, 'plus d\'épinglage sur les cartes'
+                    card.locator('.qc-chk').click(); page.wait_for_timeout(700)
                     assert '"status": "done"' in [r for r in state['projects'] if r[0] == 'p3'][0][5].replace('":"', '": "')
                     page.click('[data-act=undo-upd]'); page.wait_for_timeout(700)
                 if name == 'mobile':

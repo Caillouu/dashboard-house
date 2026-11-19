@@ -311,7 +311,7 @@
       var g=Number(r.green),o=Number(r.orange),ev=everyDays(r);if(ev>0){o=ev;g=ev-(ev>=14?3:ev>=5?2:ev>=2?1:0)}
       /* g=0 est valable : une tâche « tous les 1 jour » est à jour le jour même, à faire dès le lendemain */
       if(g>0||ev>0){c=d<=g?'g':(o>0&&d<=o)?'o':(o>0?'r':'g')}
-    }else if(everyDays(r)>0){c='o';txt='Pas encore fait'} /* un rappel est réglé mais la tâche n'a jamais été faite : elle est à faire */
+    }else if(everyDays(r)>0){c='o';txt=''} /* un rappel est réglé mais la tâche n'a jamais été faite : elle est à faire, sans rien afficher */
     if(r.forceColor&&/^[gorn]$/.test(r.forceColor))c=r.forceColor;
     if(r.customText)txt=String(r.customText).replace(/^\S+ (il y a)/i,function(){return 'Il y a'});
     return {c:c,txt:txt,snz:snoozed(r)};
@@ -550,9 +550,9 @@
     var R={r:0,o:1},GL={Kimchi:'Kimchi',Plantes:'Plantes',Maison:'Maison'};
     var L=S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue)
       .sort(function(a,b){if(R[a.st.c]!==R[b.st.c])return R[a.st.c]-R[b.st.c];return (a.r.lastDone||'')<(b.r.lastDone||'')?-1:1});
-    var td=iso(new Date()),dn=S.routines.filter(function(r){return r.lastDone===td}).length,c=$('ta-count');if(c)c.textContent=(L.length+dn)?dn+'/'+(L.length+dn):'';
+    var td=iso(new Date()),dn=S.routines.filter(function(r){return r.lastDone===td}).length,c=$('ta-count');if(c)c.textContent=dn?dn+'/'+(L.length+dn):'';   /* jamais « 0/N » */
     el.innerHTML=L.length?L.map(function(x){var r=x.r;return '<div class="tarow '+x.st.c+'">'+careChk(r)+
-      '<div class="main" role="button" tabindex="0" data-act="care-open" data-id="'+esc(r.id)+'"><span class="t">'+(r.emoji?esc(r.emoji)+' ':'')+esc(r.title)+'</span><span class="sub">'+esc((GL[r.group]||r.group||'Maison')+' · '+x.st.txt)+'</span></div></div>'}).join('')
+      '<div class="main" role="button" tabindex="0" data-act="care-open" data-id="'+esc(r.id)+'"><span class="t">'+(r.emoji?esc(r.emoji)+' ':'')+esc(r.title)+'</span><span class="sub">'+esc((GL[r.group]||r.group||'Maison')+(x.st.txt?' · '+x.st.txt:''))+'</span></div></div>'}).join('')
       :'<p class="empty">'+(loaded.routines?'Tout est à jour ✨':'Chargement…')+'</p>'}
   function setDate(id,val){
     var r=find('routines',id);if(!r)return;
@@ -658,22 +658,37 @@
   }
 
   /* Page dédiée aux quêtes (plein écran) */
+  /* Deux formes de carte : compacte dans les listes (voir et cocher), complète pour
+     les quêtes principales mises en avant (c'est là qu'on travaille). */
+  function qHead(o,fin,chk){
+    var id=esc(o.id);
+    return (qPaused(o)&&!fin?'<div class="qc-main qc-zz">💤 En pause</div>':o.main?'<div class="qc-main">📌 Quête principale</div>':'')+
+      '<div class="qc-h">'+(chk?'<button class="chk qc-chk'+(fin?' on':'')+'" data-act="pset" data-id="'+id+'" data-f="status" data-v="'+(fin?'todo':'done')+'" aria-label="'+(fin?'Rouvrir : ':'Terminer : ')+esc(o.title)+'">'+CHECK+'</button>':'')+'<span class="em" aria-hidden="true">'+esc(o.emoji||'✨')+'</span><button class="qc-t" data-act="proj-open" data-id="'+id+'">'+esc(o.title)+'</button>'+prioBtn(o)+'</div>'+
+      (qPeriod(o)?'<div class="qc-when">'+qPeriod(o)+'</div>':'');
+  }
+  function qMini(o){
+    var ss=o.steps||[],done=ss.filter(function(x){return x.done}).length,pc=ss.length?Math.round(done/ss.length*100):0,id=esc(o.id);
+    var fin=o.status==='done'||(ss.length&&done===ss.length)||qExpired(o),nx=-1;
+    for(var i=0;i<ss.length;i++)if(!ss[i].done){nx=i;break}
+    return '<article class="qcard compact'+(fin?' done':'')+(o.main?' main':'')+(qIdle(o)&&!fin?' idle':'')+'">'+
+      qHead(o,fin,fin||!ss.length)+
+      (ss.length?'<div class="qc-prog"><div class="bar"><i style="width:'+pc+'%"></i></div>'+(done?'<span>'+done+'/'+ss.length+'</span>':'')+'</div>':'')+
+      (nx>=0?'<ul class="steps"><li class="step"><button class="chk" data-act="ps" data-id="'+id+'" data-i="'+nx+'" aria-label="Mini-quête : '+esc(ss[nx].t)+'">'+CHECK+'</button><button type="button" class="st-t" data-act="proj-open" data-id="'+id+'">'+esc(ss[nx].t)+'</button>'+(ss.length-done>1?'<span class="qc-more">+'+(ss.length-done-1)+'</span>':'')+'</li></ul>':'')+
+      '</article>';
+  }
   function qCard(o){
     var ss=o.steps||[],done=ss.filter(function(x){return x.done}).length,pc=ss.length?Math.round(done/ss.length*100):0,id=esc(o.id);
     var fin=o.status==='done'||(ss.length&&done===ss.length)||qExpired(o),p=PRIO[o.prio]?o.prio:'med',st=o.status||'todo';
     var us=String(o.notes||'').match(/https?:\/\/[^\s<>"']+/g)||[];
     var note=String(o.notes||'').replace(/https?:\/\/[^\s<>"']+/g,'').trim();
     return '<article class="qcard'+(fin?' done':'')+(o.main?' main':'')+(qIdle(o)&&!fin?' idle':'')+'">'+
-      (qPaused(o)&&!fin?'<div class="qc-main qc-zz">💤 En pause</div>':o.main?'<div class="qc-main">📌 Quête principale</div>':'')+
-      '<div class="qc-h"><span class="em" aria-hidden="true">'+esc(o.emoji||'✨')+'</span><button class="qc-t" data-act="proj-open" data-id="'+id+'">'+esc(o.title)+'</button>'+'<button class="qc-pin'+(o.main?' on':'')+'" data-act="pmain" data-id="'+id+'" aria-pressed="'+!!o.main+'" aria-label="'+(o.main?'Retirer de la quête principale':'Mettre en quête principale')+'" title="'+(o.main?'Retirer de la quête principale':'Mettre en quête principale')+'">📌</button>'+
-      prioBtn(o)+'</div>'+
-      (qPeriod(o)?'<div class="qc-when">'+qPeriod(o)+'</div>':'')+
+      qHead(o,fin)+
       (ss.length?'<div class="qc-prog"><div class="bar"><i style="width:'+pc+'%"></i></div><span>'+done+'/'+ss.length+'</span></div>':'')+
       (ss.length?'<ul class="steps">'+ss.map(function(x,i){return '<li class="step'+(x.done?' done':'')+'"><button class="chk" data-act="ps" data-id="'+id+'" data-i="'+i+'" aria-label="Mini-quête : '+esc(x.t)+'">'+CHECK+'</button><button type="button" class="st-t" data-act="step-ren" data-id="'+id+'" data-i="'+i+'" title="Toucher pour renommer">'+esc(x.t)+'</button><button class="sx" data-act="sd" data-id="'+id+'" data-i="'+i+'" aria-label="Supprimer : '+esc(x.t)+'" title="Supprimer">×</button></li>'}).join('')+'</ul>':'')+
       '<form class="stepform" data-form="step" data-id="'+id+'"><input class="in" maxlength="120" data-stepinput required placeholder="Nouvelle mini-quête" aria-label="Nouvelle mini-quête pour '+esc(o.title)+'"><button class="btn" type="submit">+</button></form>'+
       (note?'<p class="qc-note">'+esc(note)+'</p>':'')+
       (us.length?'<div class="nlinks">'+us.map(function(u){return '<a class="btn ghost" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer">↗ '+esc(u.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])+'</a>'}).join('')+'</div>':'')+
-      '<div class="qc-f"><button class="lnk" data-act="proj-open" data-id="'+id+'">Modifier…</button>'+
+      '<div class="qc-f">'+
       (st==='done'?'<button class="lnk" data-act="pset" data-id="'+id+'" data-f="status" data-v="todo">'+UNDO+'Rouvrir</button>':fin?'':'<button class="qc-end" data-act="pset" data-id="'+id+'" data-f="status" data-v="done">✓ Terminer</button>')+'</div></article>';
   }
   /* Catégories de quêtes (filtres de l'onglet Quêtes). Sans catégorie choisie, on devine d'après le titre. */
@@ -696,12 +711,12 @@
     var all=S.projects.filter(function(o){return !isFin(o)&&MQ.indexOf(o)<0}),act=all.filter(inCat).sort(srt).sort(function(a,b){return (qIdle(a)?1:0)-(qIdle(b)?1:0)}),fin=S.projects.filter(isFin).filter(inCat).sort(srt);
     var chips='<div class="qfil" role="tablist" aria-label="Filtrer les quêtes">'+[['all','🗂️','Toutes']].concat(QCATS).map(function(c){return '<button type="button" role="tab" class="qf'+(qtCat===c[0]?' on':'')+'" aria-selected="'+(qtCat===c[0])+'" data-act="qt-cat" data-v="'+c[0]+'">'+(c[1]?'<span aria-hidden="true">'+c[1]+'</span>':'')+c[2]+'</button>'}).join('')+'</div>';
     var cl=QCATL[qtCat],emptyTxt=qtCat==='all'?'Aucune autre quête. Une idée ? Ajoute-la avec « + Nouvelle ».':'Rien dans '+cl[1]+' '+cl[2]+' pour l\'instant.';
-    var hero=MQ.length?'<div class="qhero"><div class="qhero-h"><span>📌 Quête'+(MQ.length>1?'s':'')+' principale'+(MQ.length>1?'s':'')+'</span><img src="assets/kimchi-anim.svg" alt=""></div>'+MQ.map(qCard).join('')+'</div>'
+    var hero=MQ.length?'<div class="qhero"><div class="qhero-h"><span>📌 Quête'+(MQ.length>1?'s':'')+' principale'+(MQ.length>1?'s':'')+'</span><img src="assets/kimchi-anim.svg" alt=""></div>'+MQ.map(function(o){return qCard(o)}).join('')+'</div>'
       :'<div class="qhero empty"><div class="qhero-h"><span>📌 Quête principale</span><img src="assets/kimchi.svg" alt=""></div><p>Pas encore de quête principale. Touche 📌 sur une quête pour la mettre en avant (jusqu\'à 3).</p></div>';
     L.innerHTML=(loaded.projects?hero:'<p class="empty">Chargement…</p>')+
       '<div class="qt-sec">Quêtes secondaires'+(all.length?' <i>'+all.length+'</i>':'')+'</div>'+chips+
-      (act.length?'<div class="qv-list">'+act.map(qCard).join('')+'</div>':'<p class="empty">'+emptyTxt+'</p>')+
-      (fin.length?'<button type="button" class="lnk donetog" data-act="qt-done" aria-expanded="'+qtDone+'">'+(qtDone?'▾':'▸')+' Terminées ('+fin.length+')</button>'+(qtDone?'<div class="qv-list">'+fin.map(qCard).join('')+'</div>':''):'')}
+      (act.length?'<div class="qv-list">'+act.map(qMini).join('')+'</div>':'<p class="empty">'+emptyTxt+'</p>')+
+      (fin.length?'<button type="button" class="lnk donetog" data-act="qt-done" aria-expanded="'+qtDone+'">'+(qtDone?'▾':'▸')+' Terminées ('+fin.length+')</button>'+(qtDone?'<div class="qv-list">'+fin.map(qMini).join('')+'</div>':''):'')}
 
   /* ---- Courses ---- */
   function parseCourse(v){ /* « 2 lait », « lait x2 », « 🥛 lait 1L » */
@@ -1270,7 +1285,7 @@
         (ss.length&&nx<0?'<div class="tq-row"><span class="tq-win">Quête accomplie 🎉</span><button class="btn tq-next" data-act="main-finish" data-id="'+id+'">Choisir la suivante</button></div>':'')+'</div>'});
     if(!MQ.length)h+='<button class="tq tq-none" data-act="qview-open"><span class="tq-k">📌 Pas de quête principale</span><span class="tq-t"><span>Ouvre les quêtes et épingles-en une</span></span></button>';
     var R={r:0,o:1},due=S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue).sort(function(a,b){return R[a.st.c]-R[b.st.c]});
-    h+='<div class="tsec">À faire'+(due.length?' <i>'+due.length+'</i>':'')+'</div>'+(due.length?due.map(function(x){var r=x.r;return '<div class="tarow '+x.st.c+'">'+careChk(r)+'<div class="main" role="button" tabindex="0" data-act="care-open" data-id="'+esc(r.id)+'"><span class="t">'+(r.emoji?esc(r.emoji)+' ':'')+esc(r.title)+'</span><span class="sub">'+esc((r.group||'Maison')+' · '+x.st.txt)+'</span></div></div>'}).join(''):'<p class="tempty">'+(loaded.routines?'Tout est à jour ✨':'Chargement…')+'</p>');
+    h+='<div class="tsec">À faire'+(due.length?' <i>'+due.length+'</i>':'')+'</div>'+(due.length?due.map(function(x){var r=x.r;return '<div class="tarow '+x.st.c+'">'+careChk(r)+'<div class="main" role="button" tabindex="0" data-act="care-open" data-id="'+esc(r.id)+'"><span class="t">'+(r.emoji?esc(r.emoji)+' ':'')+esc(r.title)+'</span><span class="sub">'+esc((r.group||'Maison')+(x.st.txt?' · '+x.st.txt:''))+'</span></div></div>'}).join(''):'<p class="tempty">'+(loaded.routines?'Tout est à jour ✨':'Chargement…')+'</p>');
     el.innerHTML=h;
   }
 
