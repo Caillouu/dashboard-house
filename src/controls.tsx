@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import { APIError } from './transport.ts'
+import { mascot } from './mascot.ts'
 
 type Member = 'p1' | 'p2'
 type LoginState = { open: boolean; message: string }
@@ -56,7 +57,7 @@ function Login({ open, message }: LoginState) {
   return (
     <div className="login">
       <form className="login-card" onSubmit={submit}>
-        <img src="/assets/kimchi.svg" alt="" />
+        <img src={'/' + mascot.image} alt="" />
         <h2>Maison</h2>
         <label htmlFor="login-member">Compte du foyer</label>
         <select className="in" id="login-member" name="member" autoComplete="username" disabled={pending}>
