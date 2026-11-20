@@ -1266,6 +1266,13 @@ body[data-tab="maison"] .addgrp{display:flex}
 .sc-weather-detail{position:relative;z-index:1}
 .sc-weather-date{display:block;margin-bottom:3px;font-size:12px;font-weight:800;color:var(--ink2)}
 .scene.night .sc-weather-date{color:#fff}
+.sc-weather-expanded:has(.sc-weather-hours){background:rgba(255,255,255,.88);border-radius:26px}
+.sc-weather-expanded:has(.sc-weather-hours) .scene{box-shadow:none}
+.sc-weather-hours{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));list-style:none;margin:0;padding:7px 12px}
+.sc-weather-hours li{display:flex;align-items:center;justify-content:center;gap:3px;color:var(--ink2);font-size:11px;font-weight:700;white-space:nowrap}
+.sc-weather-hours li+li{border-left:1px solid rgba(141,123,240,.18)}
+.sc-weather-hours svg{width:20px;height:20px;flex-shrink:0}
+.sc-weather-hours b{color:var(--ink)}
 .sc-weather-days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:8px}
 .sc-weather-days button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;padding:6px 1px;border:1px solid transparent;border-radius:14px;background:rgba(255,255,255,.88);color:var(--ink2);font:inherit;font-size:clamp(10px,2.8vw,12px);font-weight:700;white-space:nowrap;cursor:pointer}
 .sc-weather-days button[aria-pressed="true"]{border-color:var(--lav);background:#F3F0FF;color:var(--ink)}
