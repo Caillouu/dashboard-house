@@ -1,6 +1,6 @@
 export type MascotMood = 'unknown' | 'storm' | 'rain' | 'snow' | 'fog' | 'night' | 'cloudy' | 'dusk' | 'partly' | 'sunny'
 
-type Mascot = {
+export type Mascot = {
   name: 'Charlie' | 'Joey'
   image: string
   alt: string
@@ -44,8 +44,11 @@ const mascots: Mascot[] = [
   },
 ]
 
-export const mascot = mascots[Math.floor(Math.random() * mascots.length)]
+export function randomMascot(previous?: Mascot['name'] | null) {
+  const choices = previous ? mascots.filter(mascot => mascot.name !== previous) : mascots
+  return choices[Math.floor(Math.random() * choices.length)]
+}
 
-export function mascotPhrase(mood: MascotMood) {
+export function mascotPhrase(mascot: Mascot, mood: MascotMood) {
   return mascot.phrases[mood]
 }

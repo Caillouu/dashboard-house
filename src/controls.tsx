@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import { APIError } from './transport.ts'
-import { mascot } from './mascot.ts'
+import { randomMascot } from './mascot.ts'
 
 type Member = 'p1' | 'p2'
 type LoginState = { open: boolean; message: string }
@@ -11,6 +11,7 @@ type SyncState = { text: string; rejected: Rejected[] }
 const dashboardRoot = document.getElementById('dashboard-root')!
 const loginRoot = createRoot(document.getElementById('login')!)
 const syncRoot = createRoot(document.getElementById('sync-controls')!)
+const loginMascot = randomMascot()
 
 type Commands = {
   login(member: Member, code: string): Promise<void>
@@ -57,7 +58,7 @@ function Login({ open, message }: LoginState) {
   return (
     <div className="login">
       <form className="login-card" onSubmit={submit}>
-        <img src={'/' + mascot.image} alt="" />
+        <img src={'/' + loginMascot.image} alt="" />
         <h2>Maison</h2>
         <label htmlFor="login-member">Compte du foyer</label>
         <select className="in" id="login-member" name="member" autoComplete="username" disabled={pending}>
