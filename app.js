@@ -1,6 +1,6 @@
-/* Dashboard Maison — app autonome.
-   Les données vivent dans le Google Sheet de la maison. L'app ne parle qu'au script Google (Apps Script)
-   du Sheet, avec un code d'accès. Aucun identifiant (Sheet, agenda, code) n'est écrit dans ce fichier. */
+import { api, APIError, cacheKey, sessionKey, readQueue, saveOperation, removeOperation, isQueueChange, target } from './src/transport.ts'
+import { setupControls, showLogin, hideLogin, showSync } from './src/controls.tsx'
+
 (function(){
   'use strict';
   /* Jamais affichée à l'intérieur d'un autre site : GitHub Pages ne permet pas d'envoyer
@@ -28,72 +28,43 @@
   function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
   function safeUrl(u){u=String(u||'').trim();if(!u)return '';if(!/^https?:\/\//i.test(u))u='https://'+u;return /^https?:\/\/[^\s<>"']+$/i.test(u)?u:''}
 
-  /* ---- Connexion au script Google ---- */
-  var LS_API='maison-api',LS_KEY='maison-key',CK='maison-cache-v2';
-  var API_RE=/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/;
+  var CK=cacheKey,LS_KEY=sessionKey;
   function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
   function lsSet(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
-  var API=lsGet(LS_API),KEY=lsGet(LS_KEY);
-  if(API&&!API_RE.test(API))API=null;
-  /* accepte l'adresse du script seule, encodée, ou le lien d'installation complet */
-  function normApi(v){v=String(v||'').trim();var m=v.match(/#setup=(.+)$/);if(m)v=m[1];
-    for(var i=0;i<2&&/%2F/i.test(v);i++){try{v=decodeURIComponent(v)}catch(e){break}}
-    v=v.replace(/\s+/g,'').replace(/\/exec[?#].*$/,'/exec');return v}
-  (function(){ /* lien d'installation : …/#setup=<adresse du script> (le # n'est jamais envoyé à un serveur) */
-    var m=location.hash.match(/^#setup=(.+)$/);
-    if(m){var u=normApi(m[1]);
-      try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
-      if(!API_RE.test(u))return;
-      if(API&&u!==API){
-        /* changer de script en gardant le code reviendrait à l'envoyer à ce nouveau script :
-           on demande confirmation et on redemande le code dans tous les cas */
-        if(!confirm('Ce lien veut connecter l\'application à un AUTRE script que celui enregistré.\n\nN\'accepte que si tu viens de créer ce lien toi-même. Le code d\'accès sera redemandé.'))return;
-        KEY=null;lsSet(LS_KEY,null);lsSet(CK,null);
-      }
-      API=u;lsSet(LS_API,u)}
-  })();
+  var KEY=lsGet(LS_KEY),sessionEpoch=0,revisions={};
 
-  function AuthError(code){this.code=code}
-  async function api(action,data){
-    if(!API||!KEY)throw new AuthError('auth');
-    var ctl=new AbortController(),tm=setTimeout(function(){ctl.abort()},30000);
+  function lockSession(message){
+    KEY=null;sessionEpoch++;lsSet(LS_KEY,null);clearTimeout(cacheT);
+    S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};
+    cal={status:'loading',events:[]};W=null;HID=[];EVN={};if(typeof agHidden!=='undefined')agHidden.clear();sig='';fromCache=false;
+    if(typeof weatherSlide!=='undefined'){weatherSlide=0;weatherDates=[null,null];weatherTouch=null}
+    vOpen=null;render();renderCal();renderWeather();showLogin(message);
+  }
+  async function logout(){
+    if(isOffline()){alert('Reconnecte cet appareil pour le déconnecter du foyer.');return}
+    var pending=readQueue();
+    if(!confirm(pending.length?'Déconnecter cet appareil et effacer ses modifications locales ?':'Déconnecter cet appareil ?'))return;
     try{
-      var res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({k:KEY,a:action},data||{})),
-        redirect:'follow',credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:ctl.signal});
-      var j=await res.json();
-      if(!j||j.ok!==true){if(j&&(j.error==='auth'||j.error==='locked'))throw new AuthError(j.error);var er=new Error((j&&j.error)||'erreur');er.server=true;throw er}
-      return j;
-    }finally{clearTimeout(tm)}
-  }
-  function showLogin(msg){
-    var L=$('login');L.hidden=false;
-    $('login-url').hidden=!!API;$('login-url').required=!API;
-    $('login-err').textContent=msg||'';
-    setTimeout(function(){(API?$('login-code'):$('login-url')).focus()},50);
-  }
-  function logout(msg){
-    KEY=null;lsSet(LS_KEY,null);lsSet(CK,null);OB=[];lsSet(OB_KEY,null);
-    S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};cal={status:'loading',events:[]};W=null;HID=[];EVN={};sig='';
-    vOpen=null;render();renderCal();renderWeather();
-    showLogin(msg);
+      await api('logout');
+      pending.forEach(removeOperation);
+      lsSet(CK,null);lsSet(LS_KEY,null);location.reload();
+    }catch(e){alert('La déconnexion a échoué. Réessaie une fois la connexion rétablie.')}
   }
   function authFail(e){
-    if(e&&e.code==='locked'){logout('Trop d\'essais ratés. Réessaie dans 15 minutes.');return true}
-    if(e&&e.code==='auth'){logout(KEY?'Code d\'accès refusé ou changé.':'');return true}
+    if(e instanceof APIError&&e.code==='auth'){lockSession('Reconnecte-toi pour reprendre la synchronisation.');return true}
     return false;
   }
-  $('login-form').addEventListener('submit',async function(e){
-    e.preventDefault();
-    var u=normApi($('login-url').value),c=$('login-code').value;
-    if(!API){if(!API_RE.test(u)){$('login-err').textContent='Adresse du script invalide.';return}API=u;lsSet(LS_API,u)}
-    KEY=c;$('login-go').disabled=true;$('login-err').textContent='';
-    try{var j=await api('load');lsSet(LS_KEY,c);$('login-code').value='';$('login').hidden=true;applyLoad(j);startPolling()}
-    catch(err){KEY=null;
-      $('login-err').textContent=err&&err.code==='locked'?'Trop d\'essais ratés. Réessaie dans 15 minutes.':err&&err.code==='auth'?'Code incorrect.':'Le script ne répond pas. Vérifie ta connexion.'}
-    $('login-go').disabled=false;
+  setupControls({
+    login:async function(member,code){
+      await api('login',{member:member,code:code});
+      var j=await api('load');
+      KEY=j.member;lsSet(LS_KEY,KEY);hideLogin();
+      applyLoad(j);startPolling();flush();refreshIntegrations(true);
+    },
+    resolve:resolveOperation
   });
 
-  /* ---- Google Sheet : conversion lignes <-> objets ---- */
+  /* ---- Adaptation des enregistrements aux écrans existants ---- */
   var SHT={
     routines:{cols:['id','group','emoji','title','lastDone','everyN','everyUnit','_t']},
     shop:{cols:['id','emoji','title','budget','who','urgency','link','note','done','_t']},
@@ -144,81 +115,153 @@
       if(typeof v==='number')return v;
       return v==null?'':String(v)})}
 
-  /* ---- Chargement et écritures ---- */
-  var sig='',busy=false,Q=Promise.resolve(),soonT=null,pollT=null;
+  /* Les données du foyer chargent indépendamment des services externes. */
+  var sig='',busy=false,soonT=null,pollT=null;
+  var integrationAt=0;
+  function refreshIntegrations(force){
+    if(!KEY||(!force&&Date.now()-integrationAt<60000))return;
+    integrationAt=Date.now();var epoch=sessionEpoch;
+    api('agenda').then(function(j){
+      if(epoch!==sessionEpoch)return;
+      cal={status:'ok',events:j.events,calendars:j.calendars};renderCal();render();cacheNow();
+    }).catch(function(){if(epoch===sessionEpoch&&cal.status!=='ok'){cal={status:'error',events:[]};renderCal();render()}});
+    api('weather').then(function(j){
+      if(epoch!==sessionEpoch)return;
+      W=j.weather;renderWeather();render();cacheNow();
+    }).catch(function(){});
+  }
   function applyLoad(j){
-    var s=JSON.stringify([j.sheets,j.settings,j.events,j.weather,j.calError||null,j.people||null]);
-    if(fromCache){fromCache=false;$('banner').innerHTML=''}
+    revisions=j.revisions||{};
+    var s=JSON.stringify([j.sheets,j.settings,j.people,readQueue()]);
+    if(fromCache)fromCache=false;
     loaded.projects=loaded.routines=loaded.shop=loaded.courses=loaded.voyages=true;
-    V_OLD=!(j.sheets&&Array.isArray(j.sheets.voyages)); /* ancien script : pas encore d'onglet Voyages */
+    V_OLD=false;
     if(s===sig)return;sig=s;
     setPeople(j.people);
-    Object.keys(SHT).forEach(function(k){var list=[];
-      ((j.sheets&&j.sheets[k])||[]).forEach(function(r,i){if(!Array.isArray(r))return;var o=fromRow(k,r,i);if(!o.title||!o.id)return;list.push(o)});
-      S[k]=list});
-    var st=j.settings||{};HID=Array.isArray(st.hiddenEvents)?st.hiddenEvents.map(String):[];EVN=(st.eventNames&&typeof st.eventNames==='object')?st.eventNames:{};
-    overlayOutbox();
-    W=j.weather||null;
-    if(Array.isArray(j.events))cal={status:'ok',events:j.events};else if(cal.status!=='ok')cal={status:'error',events:[]};
-    renderWeather();renderCal();render();
+    Object.keys(SHT).forEach(function(k){
+      S[k]=j.sheets[k].map(function(r,i){return fromRow(k,r,i)}).filter(function(row){return row.id&&row.title});
+    });
+    var st=j.settings||{};
+    HID=Array.isArray(st.hiddenEvents)?st.hiddenEvents.map(String):[];
+    EVN=st.eventNames||{};
+    overlayOutbox();renderCal();render();cacheNow();syncNote();
   }
   async function load(){
-    if(busy||!KEY)return;
-    if(isOffline()){syncNote();return}
-    busy=true;lastLoad=Date.now();var started=Date.now();
-    try{var j=await api('load');if(started<lastWriteAt||flushing){busy=false;soon();return}applyLoad(j);flush()}
-    catch(e){if(!authFail(e)){if(cal.status!=='ok'){cal={status:'error',events:[]};renderCal()}if(OB.length)syncNote();else if(!fromCache)$('banner').innerHTML='<div class="note">Réseau lent ou absent · dernières données</div>'}}
-    busy=false;
+    if(busy||!KEY||isOffline()){syncNote();return false}
+    busy=true;lastLoad=Date.now();var started=writes,epoch=sessionEpoch;
+    try{
+      var j=await api('load');
+      if(epoch!==sessionEpoch)return false;
+      if(started!==writes||flushing){soon();return false}
+      KEY=j.member;lsSet(LS_KEY,KEY);applyLoad(j);refreshIntegrations(false);
+      return true;
+    }catch(e){
+      if(epoch===sessionEpoch&&!authFail(e))syncNote('Connexion au serveur indisponible · données locales');
+      return false;
+    }finally{busy=false}
   }
   var lastLoad=0;
-  function startPolling(){clearInterval(pollT);pollT=setInterval(function(){if(document.hidden)return;var every=(TAB==='courses'||cOpen)?15000:60000;if(Date.now()-lastLoad>=every-1000)load()},5000)}
-  /* ---- File d'attente hors ligne (« outbox ») ----
-     Chaque modification est d'abord enregistrée sur l'appareil, puis envoyée au script dès que le réseau
-     répond. Si le réseau coupe (en magasin…), rien n'est perdu : l'envoi reprend tout seul. */
-  var OB_KEY='maison-outbox',OB=(function(){try{var x=JSON.parse(lsGet(OB_KEY)||'[]');return Array.isArray(x)?x:[]}catch(e){return []}})();
-  var flushing=false,retryT=null,retryMs=3000,lastWriteAt=0;
-  function obSave(){lsSet(OB_KEY,OB.length?JSON.stringify(OB):null);syncNote()}
+  function startPolling(){clearInterval(pollT);pollT=setInterval(function(){
+    if(document.hidden)return;
+    var every=(TAB==='courses'||cOpen)?15000:60000;
+    if(Date.now()-lastLoad>=every-1000)load().then(flush);
+  },5000)}
+
+  /* Une clé locale par modification évite que deux onglets écrasent leur file respective. */
+  var flushing=false,retryT=null,retryMs=1500,writes=0,visiblePending=new Set();
   function enqueue(op){
-    OB=OB.filter(function(o){return op.a==='setting'?!(o.a==='setting'&&o.name===op.name):!(o.a!=='setting'&&o.t===op.t&&o.id===op.id)});
-    OB.push(op);obSave();flush();
+    var key=target(op),queue=readQueue();
+    var prior=queue.filter(function(item){return target(item)===key&&visiblePending.has(item.operationId)}).at(-1);
+    try{
+      var operationId=crypto.randomUUID();
+      saveOperation(Object.assign({},op,{
+        revision:prior?prior.revision+1:(revisions[key]||0),
+        operationId:operationId,
+        time:Math.max(Date.now(),(queue.at(-1)?.time||0)+1),
+        rejected:prior?.rejected?'conflict':undefined,
+      }));
+      visiblePending.add(operationId);
+    }catch(e){syncNote('Stockage local indisponible. Cette modification ne peut pas être conservée.');return}
+    syncNote();flush();
   }
   function isOffline(){return navigator.onLine===false}
+  function retry(){
+    clearTimeout(retryT);
+    retryT=setTimeout(flush,retryMs);
+    retryMs=Math.min(retryMs*2,60000);
+  }
+  async function drain(){
+    var op;
+    while(KEY&&!isOffline()&&(op=readQueue().find(function(item){return !item.rejected}))){
+      try{
+        var result=await api(op.a,op);
+        revisions[target(op)]=result.revision;
+        writes++;visiblePending.delete(op.operationId);
+        removeOperation(op);retryMs=1500;cacheNow();
+      }catch(e){
+        if(e instanceof APIError&&[400,409,413].includes(e.status)){
+          var key=target(op);
+          readQueue().filter(function(item){return target(item)===key&&!item.rejected}).forEach(function(item){
+            saveOperation(Object.assign({},item,{rejected:e.code==='conflict'?'conflict':'invalid'}));
+          });
+          sig='';continue;
+        }
+        throw e;
+      }
+    }
+  }
   async function flush(){
-    if(flushing||!KEY||!OB.length)return;
-    if(isOffline()){syncNote();return}
+    if(flushing||!KEY||isOffline()||!readQueue().some(function(op){return !op.rejected}))return;
     flushing=true;clearTimeout(retryT);syncNote();
     try{
-      while(OB.length){
-        var op=OB[0],payload=op.a==='put'?{t:op.t,row:op.row}:op.a==='del'?{t:op.t,id:op.id}:{name:op.name,value:op.value};
-        try{await api(op.a,payload)}
-        catch(e){if(!e||!e.server)throw e;fail()} /* refus du script : on n'insiste pas sur cette modif */
-        OB=OB.filter(function(x){return x!==op});lastWriteAt=Date.now();obSave();retryMs=3000;
-      }
+      if(navigator.locks)await navigator.locks.request('dashboard-house-sync',drain);
+      else await drain();
       soon();
     }catch(e){
-      if(!authFail(e)){clearTimeout(retryT);retryT=setTimeout(flush,retryMs);retryMs=Math.min(retryMs*2,60000)}
-    }
-    flushing=false;syncNote();
+      if(!authFail(e))retry();
+    }finally{flushing=false;syncNote()}
   }
-  function syncNote(){
-    var n=OB.length,off=isOffline(),txt=n?('⏳ '+n+' modif'+(n>1?'s':'')+' en attente'+(off?' · hors ligne, enregistré sur l\'appareil':' · envoi…')):(off?'Hors ligne · dernières données':'');
-    var b=$('banner');if(b){if(txt)b.innerHTML='<div class="note" data-sync>'+esc(txt)+'</div>';else if(b.querySelector('[data-sync]'))b.innerHTML=''}
-    var cn=$('cv-net');if(cn){cn.textContent=n?(off?'Hors ligne · '+n+' en attente':'Envoi…'):(off?'Hors ligne':'');cn.hidden=!cn.textContent}
+  function syncNote(message){
+    var queue=KEY?readQueue():[],n=queue.filter(function(op){return !op.rejected}).length,off=isOffline();
+    var txt=n?(n+' modification'+(n===1?'':'s')+' en attente'+(off?' · hors ligne':'')):(off?'Hors ligne · dernières données':'');
+    var rejected=Array.from(new Map(queue.filter(function(op){return op.rejected}).map(function(op){return [target(op),op]})).values());
+    showSync({text:message||txt,rejected:rejected.map(function(op){
+      var key=target(op),parts=key.split(':'),item=S[parts[0]]?.find(function(item){return item.id===parts[1]});
+      return {operationId:op.operationId,label:op.row?.[2]||item?.title||(parts[0]==='settings'?'Réglage Agenda':'Modification '+parts[0])};
+    })});
+    var cn=$('cv-net');if(cn){cn.textContent=rejected.length?'Modification à vérifier':txt;cn.hidden=!cn.textContent}
+  }
+  async function resolveOperation(operationId,retryOperation){
+    var op=readQueue().find(function(item){return item.operationId===operationId});
+    if(!op)return;
+    if(!await load()){syncNote('Reconnecte-toi pour vérifier la dernière version du foyer.');return}
+    var key=target(op);
+    var rejected=readQueue().filter(function(item){return item.rejected&&target(item)===key});
+    if(retryOperation){
+      try{saveOperation(Object.assign({},op,{revision:revisions[key]||0,operationId:crypto.randomUUID(),time:Date.now(),rejected:undefined}))}
+      catch(e){syncNote('Impossible de conserver la modification sur cet appareil.');return}
+    }
+    rejected.forEach(removeOperation);sig='';load().then(flush);syncNote();
   }
   function overlayOutbox(){
-    OB.forEach(function(op){
+    visiblePending.clear();
+    readQueue().filter(function(op){return !op.rejected}).forEach(function(op){
+      visiblePending.add(op.operationId);
       if(op.a==='put'&&SHT[op.t]){var o=fromRow(op.t,op.row,0),L=S[op.t],i=L.findIndex(function(x){return x.id===o.id});if(i>=0)L[i]=o;else L.push(o)}
       else if(op.a==='del'&&SHT[op.t]){S[op.t]=S[op.t].filter(function(x){return x.id!==op.id})}
       else if(op.a==='setting'){if(op.name==='hiddenEvents')HID=op.value;else if(op.name==='eventNames')EVN=op.value}
     });
   }
-  function soon(){clearTimeout(soonT);soonT=setTimeout(load,2500)}
+  window.addEventListener('storage',function(e){
+    if(e.key===LS_KEY&&!e.newValue&&KEY){lockSession('');return}
+    if(KEY&&isQueueChange(e.key)){overlayOutbox();render();syncNote();load().then(flush)}
+  });
+  function soon(){clearTimeout(soonT);soonT=setTimeout(load,500)}
   function shWrite(k,o){enqueue({a:'put',t:k,id:o.id,row:toRow(k,o)});return Promise.resolve()}
   function shDel(k,id){enqueue({a:'del',t:k,id:id});return Promise.resolve()}
   function saveSetting(name,value){enqueue({a:'setting',name:name,value:JSON.parse(JSON.stringify(value))});return Promise.resolve()}
 
   function upd(key,id,data){var it=find(key,id);if(!it)return;Object.assign(it,data);render();return shWrite(key,it)}
-  function fail(){$('banner').innerHTML='<div class="note">Enregistrement impossible. Recharge la page.</div>'}
   function steps(o){return (o.steps||[]).map(function(x){return {t:x.t,done:!!x.done}})}
   /* Renommer une mini-quête : on touche son texte, il devient un champ. Entrée ou un clic ailleurs enregistre, Échap annule. */
   function stepRen(b){
@@ -1304,25 +1347,21 @@
 
   /* Mémoire locale : dernières données connues, affichées si le réseau manque */
   var cacheT=null,fromCache=false;
-  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null}))}
+  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null}))}
   window.addEventListener('pagehide',cacheNow);document.addEventListener('visibilitychange',function(){if(document.hidden)cacheNow()});
   function cacheSave(){
     if(fromCache||!KEY)return;clearTimeout(cacheT);
-    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null}))},600);
+    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null}))},600);
   }
   function cacheLoad(){
     try{
       var c=JSON.parse(lsGet(CK)||'null');if(!c||!c.S)return false;
       ['projects','routines','shop','courses','voyages'].forEach(function(k){S[k]=Array.isArray(c.S[k])?c.S[k]:[];loaded[k]=true});
-      setPeople(c.P);W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
+      revisions=c.revisions||{};setPeople(c.P);W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
       overlayOutbox(); /* modifs faites hors ligne et pas encore envoyées */
       if(Array.isArray(c.cal))cal={status:'ok',events:c.cal};
       fromCache=c.t;return true;
     }catch(e){return false}
-  }
-  function cacheNote(){
-    var b=$('banner');if(!b)return;
-    if(fromCache){var d=new Date(fromCache);b.innerHTML='<div class="note">Dernières données · '+esc(d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))+'</div>'}
   }
   function render(){var ae0=document.activeElement;if(ae0&&ae0.hasAttribute&&ae0.hasAttribute('data-stepedit'))return;renderCare();renderTodoAll();renderHub();renderQTab();renderAgenda();renderTodo();renderMain();renderShop();renderCourses();renderTrips();renderTripNext();renderVView();renderSheet(true);cacheSave()}
 
@@ -1455,7 +1494,7 @@
     else if(a==='done-tog'){showDone=!showDone;lsSet('maison-show-done',showDone?'1':'0');renderTodo()}
     else if(a==='cal-range'){calRange=b.getAttribute('data-v');lsSet('maison-cal-range',calRange);renderCal()}
     else if(a==='ev-toggle'){showHid=!showHid;renderCal()}
-    else if(a==='logout'){if(confirm('Déconnecter cet appareil ? Le code d\'accès sera redemandé.'))logout('')}
+    else if(a==='logout'){logout()}
   });
 
   /* Les boutons + deviennent − quand leur formulaire est ouvert */
@@ -1566,17 +1605,17 @@
     else if(e.key==='Enter'&&t&&t.hasAttribute&&t.hasAttribute('data-snzn')){e.preventDefault();var gb=t.parentNode.querySelector('.snzgo');if(gb)gb.click()}
   });
   window.addEventListener('offline',syncNote);
-  window.addEventListener('online',function(){retryMs=3000;syncNote();flush();load()});
+  window.addEventListener('online',function(){retryMs=1500;syncNote();load().then(flush)});
 
   setTab(TAB);setView(VIEW);
   render();renderCal();
   if(location.hash==='#quetes'){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}setTab('quetes')}
   if(location.hash==='#courses')cview(true,false);
   if(location.hash==='#voyage'){var lv=lsGet('maison-trip');if(lv){setTab('voyage');vview(lv,false)}else{try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}}
-  if(!API||!KEY){showLogin('')}
+  if(!KEY){showLogin('')}
   else{
-    if(cacheLoad()){renderWeather();renderCal();render();cacheNote()}
-    load();flush();startPolling();
+    hideLogin();
+    if(cacheLoad()){renderWeather();renderCal();render()}
+    load().then(flush);startPolling();syncNote();
   }
-  if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}
 })();
