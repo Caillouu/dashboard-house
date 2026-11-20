@@ -1,6 +1,6 @@
 # Fonctionnalités à transmettre à Victor
 
-Chaque branche de fonctionnalité part de `main` sur le fork. La branche `develop` rassemble les fonctionnalités pour les tester ensemble. Victor peut reprendre chaque branche individuellement.
+Chaque nouvelle branche de fonctionnalité part de `develop` sur le fork, car `main` ne contient pas encore le socle intégré actuel. La branche `develop` rassemble les fonctionnalités pour les tester ensemble. `main` reste inchangée jusqu’à une resynchronisation explicite. Victor peut reprendre chaque branche individuellement.
 
 | Branche | Fonctionnalité | Dépendances et risques de fusion | Ordre de fusion |
 | --- | --- | --- | --- |
