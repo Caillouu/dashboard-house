@@ -74,6 +74,7 @@
   function logout(msg){
     KEY=null;lsSet(LS_KEY,null);lsSet(CK,null);OB=[];lsSet(OB_KEY,null);
     S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};cal={status:'loading',events:[]};W=null;HID=[];EVN={};sig='';
+    weatherSlide=0;weatherDates=[null,null];weatherTouch=null;
     vOpen=null;render();renderCal();renderWeather();
     showLogin(msg);
   }
@@ -463,7 +464,7 @@
   /* Kimchi réagit au moment, à la météo et au voyage — pas aux choses à faire (elles sont juste en dessous) */
   /* Vue simple : une carte « Aujourd'hui » (prochainement, à faire, quête principale, vacances) + 6 raccourcis */
   /* ---- Onglet Test : accueil « scène » — Kimchi dans un décor qui suit l'heure et la météo, une jauge arc-en-ciel, puis 4 lignes ---- */
-  function sceneMood(){var h=new Date().getHours(),c=W&&W.cond,night=W?W.isDay===false:(h>=20||h<7);
+  function sceneMood(weather, forecast){var h=forecast?12:new Date().getHours(),c=weather&&weather.cond,night=weather?weather.isDay===false:(h>=20||h<7);
     if(c==='rain'||c==='storm')return night?'night rain':'rain';if(c==='snow')return 'snow';
     if(night)return 'night';if(c==='cloudy'||c==='fog')return 'grey';if(h>=18)return 'dusk';return 'day'}
   /* Décor de la carte : soleil, nuages, pluie, neige ou étoiles selon la météo, et une colline pour Kimchi */
@@ -476,14 +477,48 @@
     if(mood==='snow')d+='<g fill="#fff" class="sc-rain"><circle cx="215" cy="80" r="2.5"/><circle cx="240" cy="86" r="2.5"/><circle cx="300" cy="92" r="2.5"/><circle cx="322" cy="84" r="2.5"/></g>';
     d+='<ellipse cx="290" cy="232" rx="150" ry="46" fill="'+(/night/.test(mood)?'#3B3374':mood==='snow'?'#F4F6FB':'#BFE8C9')+'"/>';
     return '<svg class="sc-svg" viewBox="0 0 360 230" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">'+d+'</svg>'}
+  var weatherSlide=0, weatherDates=[null,null], weatherTouch=null;
+  function weatherCard(){
+    var weather=weatherSlide===0?W:W&&W.auxerre;
+    var days=weather&&weather.days||[], date=weatherDates[weatherSlide];
+    var forecast=days.slice(1).find(function(day){return day.date===date});
+    var shown=forecast||weather, mood=sceneMood(shown, forecast), c=shown&&shown.cond;
+    var hr=forecast?12:new Date().getHours(), night=/night/.test(mood);
+    var city=weatherSlide===1?'Auxerre':weather&&weather.city||'Météo locale';
+    var t=function(n){return Number.isFinite(n)?Math.round(n)+'°':'—'};
+    var dayName=function(value, long){
+      return cap(new Date(value+'T12:00:00').toLocaleDateString('fr-FR',{weekday:long?'long':'short',day:'numeric',month:long?'long':undefined}));
+    };
+    var title=!shown||!shown.cond?'Kimchi regarde le ciel…':c==='storm'?'Orage dehors, on reste au chaud ⛈️':c==='rain'?'Il pleut, parfait pour rester au chaud ☔':c==='snow'?'Il neige ! Kimchi colle son nez à la vitre ❄️':c==='fog'?'Brouillard, tout est tout doux 🌫️':night?'Nuit calme, Kimchi dort 🌙':c==='cloudy'?'Ciel gris, Kimchi fait la sieste ☁️':hr>=18?'Belle fin de journée 🌇':c==='partly'?'Quelques éclaircies, Kimchi est de bonne humeur 🌤️':'Grand soleil, Kimchi est ravie ☀️';
+    var heading=forecast?dayName(forecast.date,true)+' · Prévision à midi':days.length?"Aujourd’hui":'';
+    var wx=shown&&shown.cond
+      ?'<div class="sc-wx"><span class="sc-wic">'+wIcon(shown.cond,shown.isDay)+'</span><span class="sc-temp">'+t(shown.temp)+'</span><span class="sc-wl"><b>'+esc(shown.label)+'</b>'+esc(city)+' · '+t(shown.low)+' / '+t(shown.high)+'</span></div>'
+      :'<div class="sc-wx"><span class="sc-wl"><b>'+esc(city)+'</b>Météo indisponible</span></div>';
+    var h='<section class="scene '+mood+'" aria-label="'+esc('Météo : '+city)+'">'+sceneDeco(mood)+
+      '<div class="sc-weather-detail" aria-live="polite">'+(heading?'<span class="sc-weather-date">'+esc(heading)+'</span>':'')+wx+'</div>'+
+      '<div class="sc-txt"><h2>'+esc(title)+'</h2></div><img class="sc-k" src="assets/kimchi-anim.svg" alt="Kimchi"></section>';
+    if(days.length>1){
+      h+='<div class="sc-weather-days" role="group" aria-label="Prévisions par jour">'+days.map(function(day,i){
+        var label=i===0?"Aujourd’hui":dayName(day.date,false);
+        var active=i===0?!forecast:forecast===day;
+        return '<button type="button" data-act="weather-day" data-id="'+(i===0?'':esc(day.date))+'" aria-pressed="'+active+'" aria-label="'+esc(label+', '+day.label+', minimum '+t(day.low)+', maximum '+t(day.high))+'">'+
+          '<span>'+esc(label)+'</span>'+wIcon(day.cond,true)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span></button>';
+      }).join('')+'</div>';
+    }
+    if(W&&Object.prototype.hasOwnProperty.call(W,'auxerre')){
+      h+='<div class="sc-weather-dots" role="group" aria-label="Lieux météo">'+[W.city||'Météo locale','Auxerre'].map(function(name,i){
+        return '<button type="button" data-act="weather-city" data-id="'+i+'" aria-label="'+esc(name)+'" aria-pressed="'+(weatherSlide===i)+'"></button>';
+      }).join('')+'</div>';
+    }
+    return h;
+  }
+  function updateWeatherCard(){
+    var panel=$('weather-slider');
+    if(panel)panel.innerHTML=weatherCard();
+  }
   function renderHub3(){var el=$('hub3');if(!el||TAB!=='home'||VIEW!=='simple')return;
-    var due=dueList(),td=iso(new Date()),done=S.routines.filter(function(r){return r.lastDone===td}).length,nt=nextTrip(),ts=nt&&tripState(nt),mood=sceneMood();
-    var hr=new Date().getHours(),c=W&&W.cond,night=/night/.test(mood);
-    /* Une seule phrase, sur la météo */
-    var title=!W?'Kimchi regarde le ciel…':c==='storm'?'Orage dehors, on reste au chaud ⛈️':c==='rain'?'Il pleut, parfait pour rester au chaud ☔':c==='snow'?'Il neige ! Kimchi colle son nez à la vitre ❄️':c==='fog'?'Brouillard, tout est tout doux 🌫️':night?'Nuit calme, Kimchi dort 🌙':c==='cloudy'?'Ciel gris, Kimchi fait la sieste ☁️':hr>=18?'Belle fin de journée 🌇':c==='partly'?'Quelques éclaircies, Kimchi est de bonne humeur 🌤️':'Grand soleil, Kimchi est ravie ☀️';
-    var t=function(n){return Math.round(n)+'°'};
-    var wx=W&&typeof W.temp==='number'?'<div class="sc-wx"><span class="sc-wic">'+wIcon(W.cond,W.isDay)+'</span><span class="sc-temp">'+t(W.temp)+'</span><span class="sc-wl"><b>'+esc(W.label||'')+'</b>'+esc(W.city||'')+(typeof W.low==='number'?' · '+t(W.low)+' / '+t(W.high):'')+'</span></div>':'';
-    var h='<section class="scene '+mood+'">'+sceneDeco(mood)+wx+'<div class="sc-txt"><h2>'+esc(title)+'</h2></div><img class="sc-k" src="assets/kimchi-anim.svg" alt="Kimchi"></section>';
+    var due=dueList(),nt=nextTrip(),ts=nt&&tripState(nt);
+    var h='<div id="weather-slider">'+weatherCard()+'</div>';
     /* En ce moment : prochain événement, missions maison, quête principale, voyage */
     var rows='';
     mains3().forEach(function(m){var ss=m.steps||[],dn=ss.filter(function(x){return x.done}).length,id=esc(m.id);
@@ -807,7 +842,20 @@
     document.addEventListener('touchmove',function(e){var t=e.touches[0];if(t)move(t.clientX,t.clientY,e)},{passive:false});
     document.addEventListener('touchend',function(){cancelPend();finish()});
     document.addEventListener('touchcancel',function(){cancelPend();finish()});
-    document.addEventListener('mousedown',function(e){if(e.button===0)start(e,e.clientX,e.clientY)});
+    document.addEventListener('touchstart',function(e){
+    weatherTouch=e.touches.length===1&&e.target.closest&&e.target.closest('#weather-slider .scene')?e.touches[0]:null;
+  },{passive:true});
+  document.addEventListener('touchcancel',function(){weatherTouch=null});
+  document.addEventListener('touchend',function(e){
+    if(!weatherTouch)return;
+    var dx=e.changedTouches[0].clientX-weatherTouch.clientX, dy=e.changedTouches[0].clientY-weatherTouch.clientY;
+    weatherTouch=null;
+    if(!W||!Object.prototype.hasOwnProperty.call(W,'auxerre')||Math.abs(dx)<45||Math.abs(dx)<=Math.abs(dy)*1.5)return;
+    var next=dx<0?1:0;
+    if(next!==weatherSlide){weatherSlide=next;updateWeatherCard()}
+  },{passive:true});
+
+  document.addEventListener('mousedown',function(e){if(e.button===0)start(e,e.clientX,e.clientY)});
     document.addEventListener('mousemove',function(e){move(e.clientX,e.clientY,e)});
     document.addEventListener('mouseup',function(){cancelPend();finish()});
     document.addEventListener('contextmenu',function(e){if(cDrag||(e.target.closest&&e.target.closest('.crow:not(.done)')&&e.target.closest('#l-courses,#cv-list')))e.preventDefault()});
@@ -1397,6 +1445,13 @@
     else if(a==='sheet-close'){iconOpen=false;tEdit=null;tplMgr=false;tplEdit=null;bilPop=null;grpEdit=null;qCal=null;if(evEdit){evEdit=null;renderSheet();return}agOpen=false;evEdit=null;wishOpen=null;projId=null;openId=null;calFor=null;confirmDel=null;renderSheet()}
     else if(a==='care-add'){var csec2=b.closest('section'),cf=csec2&&csec2.querySelector('form.care-add');if(cf){cf.hidden=!cf.hidden;if(!cf.hidden)cf.querySelector('input').focus()}}
     else if(a==='care-chk'){careToggle(id)}
+    else if(a==='weather-day'||a==='weather-city'){
+      if(a==='weather-day')weatherDates[weatherSlide]=id||null;
+      else weatherSlide=Number(id);
+      updateWeatherCard();
+      var selected=$('weather-slider').querySelector('[data-act="'+a+'"][aria-pressed="true"]');
+      if(selected)selected.focus({preventScroll:true});
+    }
     else if(a==='hub-go'){hubGo(b.getAttribute('data-v'))}
     else if(a==='view-set'){setView(b.getAttribute('data-v'))}
     else if(a==='view-toggle'){setView(VIEW==='simple'?'detail':'simple')}
