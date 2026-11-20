@@ -1,6 +1,6 @@
 import { api, APIError, cacheKey, sessionKey, readQueue, saveOperation, removeOperation, isQueueChange, target } from './src/transport.ts'
 import { setupControls, showLogin, hideLogin, showSync } from './src/controls.tsx'
-import { mascot, mascotPhrase } from './src/mascot.ts'
+import { randomMascot, mascotPhrase } from './src/mascot.ts'
 
 (function(){
   'use strict';
@@ -38,7 +38,7 @@ import { mascot, mascotPhrase } from './src/mascot.ts'
     KEY=null;sessionEpoch++;lsSet(LS_KEY,null);clearTimeout(cacheT);
     S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};
     cal={status:'loading',events:[]};W=null;HID=[];EVN={};if(typeof agHidden!=='undefined')agHidden.clear();sig='';fromCache=false;
-    if(typeof weatherSlide!=='undefined'){weatherSlide=0;weatherDates=[null,null];weatherTouch=null}
+    if(typeof weatherSlide!=='undefined'){weatherSlide=0;weatherDates=[null,null];weatherTouch=null;weatherMascots=[randomMascot(),randomMascot()]}
     vOpen=null;render();renderCal();renderWeather();showLogin(message);
   }
   async function logout(){
@@ -520,7 +520,7 @@ import { mascot, mascotPhrase } from './src/mascot.ts'
     if(mood==='snow')d+='<g fill="#fff" class="sc-rain"><circle cx="215" cy="80" r="2.5"/><circle cx="240" cy="86" r="2.5"/><circle cx="300" cy="92" r="2.5"/><circle cx="322" cy="84" r="2.5"/></g>';
     d+='<ellipse cx="290" cy="232" rx="150" ry="46" fill="'+(/night/.test(mood)?'#3B3374':mood==='snow'?'#F4F6FB':'#BFE8C9')+'"/>';
     return '<svg class="sc-svg" viewBox="0 0 360 230" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">'+d+'</svg>'}
-  var weatherSlide=0, weatherDates=[null,null], weatherTouch=null;
+  var weatherSlide=0, weatherDates=[null,null], weatherTouch=null, weatherMascots=[randomMascot(),randomMascot()];
   function weatherCard(slide){
     var weather=slide===0?W:W&&W.auxerre;
     var days=weather&&weather.days||[], date=weatherDates[slide];
@@ -536,14 +536,14 @@ import { mascot, mascotPhrase } from './src/mascot.ts'
       return cap(new Date(value+'T12:00:00').toLocaleDateString('fr-FR',{weekday:long?'long':'short',day:'numeric',month:long?'long':undefined}));
     };
     var phraseMood=!shown||!shown.cond?'unknown':c==='storm'?'storm':c==='rain'?'rain':c==='snow'?'snow':c==='fog'?'fog':night?'night':c==='cloudy'?'cloudy':hr>=18?'dusk':c==='partly'?'partly':'sunny';
-    var title=mascotPhrase(phraseMood);
+    var weatherMascot=weatherMascots[slide], title=mascotPhrase(weatherMascot,phraseMood);
     var heading=forecast?dayName(forecast.date,true)+' · Prévision à midi':days.length?"Aujourd’hui":'';
     var wx=shown&&shown.cond
       ?'<div class="sc-wx"><span class="sc-wic">'+wIcon(shown.cond,shown.isDay)+'</span><span class="sc-temp">'+t(shown.temp)+'</span><span class="sc-wl"><b>'+esc(shown.label)+'</b>'+esc(city)+' · '+t(shown.low)+' / '+t(shown.high)+'</span></div>'
       :'<div class="sc-wx"><span class="sc-wl"><b>'+esc(city)+'</b>Météo indisponible</span></div>';
     var h='<div class="sc-weather-expanded"><section class="scene '+mood+'" aria-label="'+esc('Météo : '+city)+'">'+sceneDeco(mood)+
       '<div class="sc-weather-detail" aria-live="polite">'+(heading?'<span class="sc-weather-date">'+esc(heading)+'</span>':'')+wx+'</div>'+
-      '<div class="sc-txt"><h2>'+esc(title)+'</h2></div><img class="sc-k" src="'+esc(mascot.image)+'" alt="'+esc(mascot.name)+'"></section>';
+      '<div class="sc-txt"><h2>'+esc(title)+'</h2></div><img class="sc-k" src="'+esc(weatherMascot.image)+'" alt="'+esc(weatherMascot.name)+'"></section>';
     if(hours.length){
       h+='<ul class="sc-weather-hours" aria-label="Prévisions horaires">'+hours.map(function(slot){
         var time=slot.hour+' h', label=time+', '+slot.label+', '+t(slot.temp);
@@ -821,8 +821,9 @@ import { mascot, mascotPhrase } from './src/mascot.ts'
     var all=S.projects.filter(function(o){return !isFin(o)&&MQ.indexOf(o)<0}),act=all.filter(inCat).sort(srt).sort(function(a,b){return (qIdle(a)?1:0)-(qIdle(b)?1:0)}),fin=S.projects.filter(isFin).filter(inCat).sort(srt);
     var chips='<div class="qfil" role="tablist" aria-label="Filtrer les quêtes">'+[['all','🗂️','Toutes']].concat(QCATS).map(function(c){return '<button type="button" role="tab" class="qf'+(qtCat===c[0]?' on':'')+'" aria-selected="'+(qtCat===c[0])+'" data-act="qt-cat" data-v="'+c[0]+'">'+(c[1]?'<span aria-hidden="true">'+c[1]+'</span>':'')+c[2]+'</button>'}).join('')+'</div>';
     var cl=QCATL[qtCat],emptyTxt=qtCat==='all'?'Aucune autre quête. Une idée ? Ajoute-la avec « + Nouvelle ».':'Rien dans '+cl[1]+' '+cl[2]+' pour l\'instant.';
-    var hero=MQ.length?'<div class="qhero"><div class="qhero-h"><span>📌 Quête'+(MQ.length>1?'s':'')+' principale'+(MQ.length>1?'s':'')+'</span><img src="'+esc(mascot.image)+'" alt=""></div>'+MQ.map(function(o){return qCard(o)}).join('')+'</div>'
-      :'<div class="qhero empty"><div class="qhero-h"><span>📌 Quête principale</span><img src="'+esc(mascot.image)+'" alt=""></div><p>Pas encore de quête principale. Touche 📌 sur une quête pour la mettre en avant (jusqu\'à 3).</p></div>';
+    var heroMascot=randomMascot();
+    var hero=MQ.length?'<div class="qhero"><div class="qhero-h"><span>📌 Quête'+(MQ.length>1?'s':'')+' principale'+(MQ.length>1?'s':'')+'</span><img src="'+esc(heroMascot.image)+'" alt=""></div>'+MQ.map(function(o){return qCard(o)}).join('')+'</div>'
+      :'<div class="qhero empty"><div class="qhero-h"><span>📌 Quête principale</span><img src="'+esc(heroMascot.image)+'" alt=""></div><p>Pas encore de quête principale. Touche 📌 sur une quête pour la mettre en avant (jusqu\'à 3).</p></div>';
     L.innerHTML=(loaded.projects?hero:'<p class="empty">Chargement…</p>')+
       '<div class="qt-sec">Quêtes secondaires'+(all.length?' <i>'+all.length+'</i>':'')+'</div>'+chips+
       (act.length?'<div class="qv-list">'+act.map(qMini).join('')+'</div>':'<p class="empty">'+emptyTxt+'</p>')+
@@ -956,10 +957,12 @@ import { mascot, mascotPhrase } from './src/mascot.ts'
 
   /* ---- Onglets (Accueil / Maison / Courses) ---- */
   var TAB=lsGet('maison-tab')||'home';if(TAB==='test')TAB='home';if(['home','maison','courses','voyage','quetes','agenda'].indexOf(TAB)<0)TAB='home';
+  function randomizeMascotImages(){[].forEach.call(document.querySelectorAll('img[data-random-mascot]'),function(img){
+    var next=randomMascot(img.getAttribute('data-mascot'));img.src=next.image;img.setAttribute('data-mascot',next.name);if(img.alt&&img.alt!=='Maison')img.alt=next.alt})}
   function setTab(t){TAB=t;lsSet('maison-tab',t);document.body.setAttribute('data-tab',t);
     var PT={maison:'Routines',courses:'Courses',voyage:'Voyages',agenda:'Agenda'},ph=$('pt-h');if(ph)ph.textContent=PT[t]||'';var pa=$('pt-act');if(pa)pa.hidden=t!=='voyage';
     [].forEach.call(document.querySelectorAll('.tabbar button'),function(b){var on=b.getAttribute('data-tab')===t;b.classList.toggle('on',on);b.setAttribute('aria-current',on?'page':'false')});
-    window.scrollTo(0,0);fitTodo();if(t==='home')renderHub();if(t==='quetes')renderQTab();if(t==='agenda')renderAgenda();if((t==='courses'||t==='voyage')&&Date.now()-lastLoad>15000)load()}
+    randomizeMascotImages();window.scrollTo(0,0);fitTodo();if(t==='home')renderHub();if(t==='quetes')renderQTab();if(t==='agenda')renderAgenda();if((t==='courses'||t==='voyage')&&Date.now()-lastLoad>15000)load()}
   function whoLabel(k){return k==='couple'?'Couple':(PEOPLE[k]||(k==='p1'?'Personne 1':k==='p2'?'Personne 2':''))}
   var UW={high:3,med:2,low:1};
   function fitTotal(){var te=$('w-total');if(!te)return;te.style.visibility='';requestAnimationFrame(function(){if(te.scrollWidth>te.clientWidth+1)te.style.visibility='hidden'})}
@@ -1530,6 +1533,7 @@ import { mascot, mascotPhrase } from './src/mascot.ts'
     else if(a==='care-chk'){careToggle(id)}
     else if(a==='weather-day'){
       weatherDates[weatherSlide]=id||null;
+      weatherMascots[weatherSlide]=randomMascot(weatherMascots[weatherSlide].name);
       var slide=b.closest('.sc-weather-slide');
       slide.innerHTML=weatherCard(weatherSlide);
       slide.querySelector('[aria-pressed="true"]').focus({preventScroll:true});

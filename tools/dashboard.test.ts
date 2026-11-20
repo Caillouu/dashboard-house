@@ -4,6 +4,15 @@ import { test } from 'node:test'
 import { createClient } from '@libsql/client'
 import { dashboard } from '../server/handler.ts'
 import { migrate } from './migrate.ts'
+import { mascotPhrase, randomMascot } from '../src/mascot.ts'
+
+test('mascots alternate and keep their matching phrase', () => {
+  const first = randomMascot()
+  const second = randomMascot(first.name)
+  assert.notEqual(second.name, first.name)
+  assert.match(mascotPhrase(first, 'sunny'), new RegExp(first.name))
+  assert.match(mascotPhrase(second, 'unknown'), new RegExp(second.name))
+})
 
 test('sessions, household state, repeated requests, and stale offline edits', async () => {
   const db = createClient({ url: 'file::memory:' })
