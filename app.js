@@ -482,7 +482,10 @@
     var weather=slide===0?W:W&&W.auxerre;
     var days=weather&&weather.days||[], date=weatherDates[slide];
     var forecast=days.slice(1).find(function(day){return day.date===date});
-    var shown=forecast||weather, mood=sceneMood(shown, forecast), c=shown&&shown.cond;
+    var selected=forecast||weather, hours=selected&&selected.hours||[];
+    var noon=forecast&&hours.find(function(slot){return slot.hour===12});
+    var shown=noon?Object.assign({},forecast,noon):selected;
+    var mood=sceneMood(shown, forecast), c=shown&&shown.cond;
     var hr=forecast?12:new Date().getHours(), night=/night/.test(mood);
     var city=slide===1?'Auxerre':weather&&weather.city||'Météo locale';
     var t=function(n){return Number.isFinite(n)?Math.round(n)+'°':'—'};
@@ -494,16 +497,22 @@
     var wx=shown&&shown.cond
       ?'<div class="sc-wx"><span class="sc-wic">'+wIcon(shown.cond,shown.isDay)+'</span><span class="sc-temp">'+t(shown.temp)+'</span><span class="sc-wl"><b>'+esc(shown.label)+'</b>'+esc(city)+' · '+t(shown.low)+' / '+t(shown.high)+'</span></div>'
       :'<div class="sc-wx"><span class="sc-wl"><b>'+esc(city)+'</b>Météo indisponible</span></div>';
-    var h='<section class="scene '+mood+'" aria-label="'+esc('Météo : '+city)+'">'+sceneDeco(mood)+
+    var h='<div class="sc-weather-expanded"><section class="scene '+mood+'" aria-label="'+esc('Météo : '+city)+'">'+sceneDeco(mood)+
       '<div class="sc-weather-detail" aria-live="polite">'+(heading?'<span class="sc-weather-date">'+esc(heading)+'</span>':'')+wx+'</div>'+
       '<div class="sc-txt"><h2>'+esc(title)+'</h2></div><img class="sc-k" src="assets/kimchi-anim.svg" alt="Kimchi"></section>';
+    if(hours.length){
+      h+='<ul class="sc-weather-hours" aria-label="Prévisions horaires">'+hours.map(function(slot){
+        var time=slot.hour+' h', label=time+', '+slot.label+', '+t(slot.temp);
+        return '<li aria-label="'+esc(label)+'"><span>'+time+'</span>'+wIcon(slot.cond,slot.isDay)+'<b>'+t(slot.temp)+'</b></li>';
+      }).join('')+'</ul>';
+    }
+    h+='</div>';
     if(days.length>1){
       h+='<div class="sc-weather-days" role="group" aria-label="Prévisions par jour">'+days.map(function(day,i){
         var label=i===0?"Aujourd’hui":dayName(day.date,false);
         var active=i===0?!forecast:forecast===day;
-        var conditions=i===0?weather:day;
-        return '<button type="button" data-act="weather-day" data-id="'+(i===0?'':esc(day.date))+'" aria-pressed="'+active+'" aria-label="'+esc(label+', '+conditions.label+', minimum '+t(day.low)+', maximum '+t(day.high))+'">'+
-          '<span>'+esc(label)+'</span>'+wIcon(conditions.cond,conditions.isDay)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span></button>';
+        return '<button type="button" data-act="weather-day" data-id="'+(i===0?'':esc(day.date))+'" aria-pressed="'+active+'" aria-label="'+esc(label+', '+day.label+', minimum '+t(day.low)+', maximum '+t(day.high))+'">'+
+          '<span>'+esc(label)+'</span>'+wIcon(day.cond,day.isDay)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span></button>';
       }).join('')+'</div>';
     }
     return h;

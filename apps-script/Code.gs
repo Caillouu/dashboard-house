@@ -268,21 +268,28 @@ function weather_() {
 
 function weatherAt_(lat, lon, city) {
   var cache = CacheService.getScriptCache();
-  var key = ['weather-v2', lat, lon, city].join(':');
+  var key = ['weather-v3', lat, lon, city].join(':');
   var hit = cache.get(key);
   if (hit) return JSON.parse(hit);
   try {
     var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-      '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,weather_code&hourly=temperature_2m&timezone=Europe%2FParis&forecast_days=5';
+      '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,weather_code&hourly=temperature_2m,weather_code,is_day&timezone=Europe%2FParis&forecast_days=5';
     var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: false });
     if (res.getResponseCode() !== 200) return null;
     var j = JSON.parse(res.getContentText());
-    var noon = {};
+    var hoursByDate = {};
     j.hourly.time.forEach(function (time, i) {
-      if (time.slice(11) === '12:00') noon[time.slice(0, 10)] = j.hourly.temperature_2m[i];
+      var hour = Number(time.slice(11, 13));
+      if ([8, 12, 16, 20].indexOf(hour) === -1) return;
+      var date = time.slice(0, 10);
+      if (!hoursByDate[date]) hoursByDate[date] = [];
+      hoursByDate[date].push(Object.assign({ hour: hour, temp: j.hourly.temperature_2m[i] },
+        weatherCondition_(j.hourly.weather_code[i], !!j.hourly.is_day[i])));
     });
     var days = j.daily.time.map(function (date, i) {
-      return Object.assign({ date: date, city: city, temp: noon[date],
+      var hours = hoursByDate[date] || [];
+      var noon = hours.find(function (slot) { return slot.hour === 12; });
+      return Object.assign({ date: date, city: city, temp: noon ? noon.temp : null, hours: hours,
         low: j.daily.temperature_2m_min[i], high: j.daily.temperature_2m_max[i] },
         weatherCondition_(j.daily.weather_code[i], true));
     });
@@ -328,7 +335,7 @@ function verifier() {
     var c = CalendarApp.getCalendarById(id);
     console.log(c ? '✅ Agenda n°' + (i + 1) + ' accessible' : '❌ Agenda n°' + (i + 1) + ' introuvable : accepte le partage reçu par e-mail sur le compte dédié');
   });
-  var weatherKey = ['weather-v2', Number(p.getProperty('WEATHER_LAT') || 48.8566), Number(p.getProperty('WEATHER_LON') || 2.3522), String(p.getProperty('WEATHER_CITY') || 'Paris').slice(0, 40)].join(':');
-  CacheService.getScriptCache().removeAll(['events', weatherKey, 'weather-v2:47.7982:3.5738:Auxerre']);
+  var weatherKey = ['weather-v3', Number(p.getProperty('WEATHER_LAT') || 48.8566), Number(p.getProperty('WEATHER_LON') || 2.3522), String(p.getProperty('WEATHER_CITY') || 'Paris').slice(0, 40)].join(':');
+  CacheService.getScriptCache().removeAll(['events', weatherKey, 'weather-v3:47.7982:3.5738:Auxerre']);
   try { var weather = weather_(); console.log(typeof weather.temp === 'number' ? '✅ Météo principale OK' : '❌ Météo principale indisponible'); console.log(weather.auxerre ? '✅ Météo Auxerre OK' : '❌ Météo Auxerre indisponible'); } catch (e) { console.log('❌ Météo : ' + e); }
 }
