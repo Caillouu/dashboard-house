@@ -60,8 +60,8 @@ function Login({ open, message }: LoginState) {
         <h2>Maison</h2>
         <label htmlFor="login-member">Compte du foyer</label>
         <select className="in" id="login-member" name="member" autoComplete="username" disabled={pending}>
-          <option value="p1">Membre 1</option>
-          <option value="p2">Membre 2</option>
+          <option value="p1">Pierre</option>
+          <option value="p2">Justine</option>
         </select>
         <label htmlFor="login-code">Code personnel</label>
         <input ref={codeInput} className="in" id="login-code" name="code" type="password" required maxLength={200} autoComplete="current-password" disabled={pending} />
