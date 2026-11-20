@@ -80,7 +80,7 @@ function load_() {
   var people = { p1: String(props.getProperty('PERSON_1') || '').slice(0, 30), p2: String(props.getProperty('PERSON_2') || '').slice(0, 30) };
   var res = { sheets: sheets, settings: readSettings_(ss), people: people, weather: null, events: null };
   try { res.weather = weather_(); } catch (e) { console.warn(e); }
-  try { res.events = events_(); } catch (e) { console.warn(e); res.calError = true; }
+  try { var agenda = events_(); res.events = agenda.events; res.calendars = agenda.calendars; } catch (e) { console.warn(e); res.calError = true; }
   return res;
 }
 function nonEmpty_(x) { return String(x == null ? '' : x).trim() !== ''; }
@@ -221,7 +221,7 @@ function newId_() { return 'g' + Date.now().toString(36) + Math.floor(Math.rando
 /* ---------- Agenda (lecture seule, strict minimum) ---------- */
 function events_() {
   var cache = CacheService.getScriptCache();
-  var hit = cache.get('events');
+  var hit = cache.get('events-v2');
   if (hit) return JSON.parse(hit);
   var ids = (PropertiesService.getScriptProperties().getProperty('CALENDAR_IDS') || '')
     .split(',').map(function (s) { return s.trim(); }).filter(Boolean);
@@ -229,27 +229,43 @@ function events_() {
   var now = new Date();
   var start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   var end = new Date(start.getTime() + 35 * 864e5);
-  var out = [], seen = {};
+  var out = [], calendars = [], seen = Object.create(null);
+  ids = ids.filter(function (id, i) { return ids.indexOf(id) === i; });
   ids.forEach(function (id) {
     var c = CalendarApp.getCalendarById(id);
     if (!c) { console.warn('Agenda introuvable : ' + id); return; }
+    var calendarId = shortHash_(id);
+    calendars.push({ id: calendarId, name: calendarLabel_(c.getName(), calendars.length + 1) });
     c.getEvents(start, end).forEach(function (ev) {
       var allDay = ev.isAllDayEvent();
       var st = allDay ? { date: Utilities.formatDate(ev.getAllDayStartDate(), tz, 'yyyy-MM-dd') }
                       : { dateTime: ev.getStartTime().toISOString() };
       var title = String(ev.getTitle() || '').slice(0, 120);
       var key = title + '|' + (st.date || st.dateTime);
-      if (seen[key]) return;
-      seen[key] = 1;
-      out.push({ id: shortHash_(ev.getId() + '|' + (st.date || st.dateTime)), summary: title, start: st });
+      if (seen[key]) {
+        if (seen[key].calendars.indexOf(calendarId) < 0) seen[key].calendars.push(calendarId);
+        return;
+      }
+      var event = { id: shortHash_(ev.getId() + '|' + (st.date || st.dateTime)), summary: title, start: st, calendars: [calendarId] };
+      seen[key] = event;
+      out.push(event);
     });
   });
   out.sort(function (a, b) {
     return (a.start.dateTime || a.start.date + 'T00:00') < (b.start.dateTime || b.start.date + 'T00:00') ? -1 : 1;
   });
-  out = out.slice(0, 80);
-  cache.put('events', JSON.stringify(out), 300);
-  return out;
+  var agenda = { events: out.slice(0, 80), calendars: calendars };
+  cache.put('events-v2', JSON.stringify(agenda), 300);
+  return agenda;
+}
+function calendarLabel_(name, position) {
+  var label = String(name || '').trim()
+    .replace(/^(?:(?:mon|ma|mes|le|la|les|my|the)\s+)?(?:agenda|calendrier|calendar)\b\s*[:–—-]?\s*(?:(?:de|du|des)\s+|d['’])?/i, '')
+    .replace(/\s+(?:agenda|calendrier|calendar)$/i, '')
+    .replace(/^([^@\s]+)@[^@\s]+$/, '$1')
+    .replace(/^(?:personnel|personnelle)$/i, 'Perso')
+    .trim();
+  return label ? (label.charAt(0).toUpperCase() + label.slice(1)).slice(0, 60) : 'Agenda ' + position;
 }
 function shortHash_(s) {
   var d = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, s, Utilities.Charset.UTF_8);
