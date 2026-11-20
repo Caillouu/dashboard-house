@@ -501,8 +501,9 @@
       h+='<div class="sc-weather-days" role="group" aria-label="Prévisions par jour">'+days.map(function(day,i){
         var label=i===0?"Aujourd’hui":dayName(day.date,false);
         var active=i===0?!forecast:forecast===day;
-        return '<button type="button" data-act="weather-day" data-id="'+(i===0?'':esc(day.date))+'" aria-pressed="'+active+'" aria-label="'+esc(label+', '+day.label+', minimum '+t(day.low)+', maximum '+t(day.high))+'">'+
-          '<span>'+esc(label)+'</span>'+wIcon(day.cond,true)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span></button>';
+        var conditions=i===0?weather:day;
+        return '<button type="button" data-act="weather-day" data-id="'+(i===0?'':esc(day.date))+'" aria-pressed="'+active+'" aria-label="'+esc(label+', '+conditions.label+', minimum '+t(day.low)+', maximum '+t(day.high))+'">'+
+          '<span>'+esc(label)+'</span>'+wIcon(conditions.cond,conditions.isDay)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span></button>';
       }).join('')+'</div>';
     }
     return h;
