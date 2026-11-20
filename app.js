@@ -73,7 +73,7 @@
   }
   function logout(msg){
     KEY=null;lsSet(LS_KEY,null);lsSet(CK,null);OB=[];lsSet(OB_KEY,null);
-    S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};cal={status:'loading',events:[]};W=null;HID=[];EVN={};sig='';
+    S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};cal={status:'loading',events:[]};W=null;HID=[];EVN={};agHidden.clear();sig='';
     weatherSlide=0;weatherDates=[null,null];weatherTouch=null;
     vOpen=null;render();renderCal();renderWeather();
     showLogin(msg);
@@ -148,7 +148,7 @@
   /* ---- Chargement et écritures ---- */
   var sig='',busy=false,Q=Promise.resolve(),soonT=null,pollT=null;
   function applyLoad(j){
-    var s=JSON.stringify([j.sheets,j.settings,j.events,j.weather,j.calError||null,j.people||null]);
+    var s=JSON.stringify([j.sheets,j.settings,j.events,j.calendars,j.weather,j.calError||null,j.people||null]);
     if(fromCache){fromCache=false;$('banner').innerHTML=''}
     loaded.projects=loaded.routines=loaded.shop=loaded.courses=loaded.voyages=true;
     V_OLD=!(j.sheets&&Array.isArray(j.sheets.voyages)); /* ancien script : pas encore d'onglet Voyages */
@@ -160,7 +160,7 @@
     var st=j.settings||{};HID=Array.isArray(st.hiddenEvents)?st.hiddenEvents.map(String):[];EVN=(st.eventNames&&typeof st.eventNames==='object')?st.eventNames:{};
     overlayOutbox();
     W=j.weather||null;
-    if(Array.isArray(j.events))cal={status:'ok',events:j.events};else if(cal.status!=='ok')cal={status:'error',events:[]};
+    if(Array.isArray(j.events))cal={status:'ok',events:j.events,calendars:Array.isArray(j.calendars)?j.calendars:[]};else if(cal.status!=='ok')cal={status:'error',events:[]};
     renderWeather();renderCal();render();
   }
   async function load(){
@@ -565,10 +565,12 @@
     h+='<button class="viewbot" type="button" data-act="view-toggle">Passer à la vue détaillée</button>';
     el.innerHTML=h}
   /* ---- Onglet Agenda : ce qui va se passer dans les prochains jours et semaines ---- */
-  var agSel=null;
+  var agSel=null,agHidden=new Set();
   function renderAgenda(){var el=$('agtab');if(!el||TAB!=='agenda')return;
     var t0d=t0(),items=[],now=new Date();
-    if(cal.status==='ok')cal.events.forEach(function(e){if(!e||HID.indexOf(e.id)>=0)return;var i=evInfo(e);if(!i||i.n<0)return;if(i.n===0&&!i.allDay&&i.d<now&&now-i.d>3*36e5)return;
+    var calendars=cal.calendars||[],focused=document.activeElement,focusId=focused&&el.contains(focused)?focused.getAttribute('data-calendar'):null;
+    var filters=calendars.map(function(c){return '<button type="button" class="ag-filter" data-act="ag-filter" data-calendar="'+esc(c.id)+'" aria-pressed="'+!agHidden.has(c.id)+'" title="'+esc(c.name)+'">'+esc(c.name)+'</button>'}).join('');
+    if(cal.status==='ok')cal.events.forEach(function(e){if(!e||HID.indexOf(e.id)>=0||(e.calendars&&e.calendars.every(function(id){return agHidden.has(id)})))return;var i=evInfo(e);if(!i||i.n<0)return;if(i.n===0&&!i.allDay&&i.d<now&&now-i.d>3*36e5)return;
       items.push({n:i.n,k:i.allDay?'':i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),t:EVN[e.id]||e.summary||'Sans titre',id:e.id,type:'ev'})});
     trips().forEach(function(t){var sp=tripSpan(t);if(!sp.s)return;var a=diff(sp.s),b=sp.e?diff(sp.e):a;
       if(a>=0&&a<=60)items.push({n:a,k:hPart(t.start),t:'Départ · '+t.title,em:tEmo(t),id:t.id,type:'trip'});
@@ -590,8 +592,10 @@
         :'<p class="ag-none">'+(cal.status==='ok'?'Rien de prévu 🐾':cal.status==='loading'?'Chargement…':'—')+'</p>')+'</section>'}
     if(cal.status!=='ok'&&cal.status!=='loading')body='<p class="empty">L\'agenda ne répond pas pour le moment.</p>'+body;
     var nHid=cal.status==='ok'?cal.events.filter(function(e){return e&&HID.indexOf(e.id)>=0}).length:0;
-    el.innerHTML='<div class="ag-list">'+body+'</div>'+(nHid?'<button class="lnk ag-hid" data-act="ag-hid">'+nHid+' événement'+(nHid>1?'s':'')+' masqué'+(nHid>1?'s':'')+' · tout réafficher</button>':'')+
-      '<a class="ag-gc" href="https://calendar.google.com/calendar/u/0/r/week" target="_blank" rel="noopener noreferrer">Ouvrir Google Agenda ↗</a>'}
+    el.innerHTML=(filters?'<div class="ag-filters" role="group" aria-label="Agendas synchronisés">'+filters+'</div>':'')+'<div class="ag-list">'+body+'</div>'+(nHid?'<button class="lnk ag-hid" data-act="ag-hid">'+nHid+' événement'+(nHid>1?'s':'')+' masqué'+(nHid>1?'s':'')+' · tout réafficher</button>':'')+
+      '<a class="ag-gc" href="https://calendar.google.com/calendar/u/0/r/week" target="_blank" rel="noopener noreferrer">Ouvrir Google Agenda ↗</a>';
+    if(focusId!==null)Array.prototype.some.call(el.querySelectorAll('[data-calendar]'),function(button){if(button.getAttribute('data-calendar')!==focusId)return false;button.focus({preventScroll:true});return true});
+  }
   /* Petite fête quand on coche la dernière chose du jour */
   function celebrate(){[].forEach.call(document.querySelectorAll('.k2,.sc-k'),function(k){k.classList.remove('jump');void k.offsetWidth;k.classList.add('jump')});
     if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
@@ -1376,11 +1380,11 @@
 
   /* Mémoire locale : dernières données connues, affichées si le réseau manque */
   var cacheT=null,fromCache=false;
-  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null}))}
+  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))}
   window.addEventListener('pagehide',cacheNow);document.addEventListener('visibilitychange',function(){if(document.hidden)cacheNow()});
   function cacheSave(){
     if(fromCache||!KEY)return;clearTimeout(cacheT);
-    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null}))},600);
+    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))},600);
   }
   function cacheLoad(){
     try{
@@ -1388,7 +1392,7 @@
       ['projects','routines','shop','courses','voyages'].forEach(function(k){S[k]=Array.isArray(c.S[k])?c.S[k]:[];loaded[k]=true});
       setPeople(c.P);W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
       overlayOutbox(); /* modifs faites hors ligne et pas encore envoyées */
-      if(Array.isArray(c.cal))cal={status:'ok',events:c.cal};
+      if(Array.isArray(c.cal))cal={status:'ok',events:c.cal,calendars:Array.isArray(c.calendars)?c.calendars:[]};
       fromCache=c.t;return true;
     }catch(e){return false}
   }
@@ -1520,6 +1524,7 @@
     else if(a==='cview-close'){cview(false,true)}
     else if(a==='qview-open'){setTab('quetes')}
     else if(a==='ag-day'){var nd=Number(b.getAttribute('data-v'));agSel=nd;renderAgenda();var g=document.getElementById('ag-d'+nd);if(g)g.scrollIntoView({block:'start',behavior:'smooth'});else toastMsg('Rien de prévu ce jour-là')}
+    else if(a==='ag-filter'){var calendarId=b.getAttribute('data-calendar');if(agHidden.has(calendarId))agHidden.delete(calendarId);else agHidden.add(calendarId);renderAgenda()}
     else if(a==='ag-hid'){setHid([]);renderAgenda()}
     else if(a==='qt-done'){qtDone=!qtDone;renderQTab()}
     else if(a==='qt-cat'){qtCat=b.getAttribute('data-v');if(qtCat!=='all'&&!QCATL[qtCat])qtCat='all';try{localStorage.setItem('maison-qcat',qtCat)}catch(e){}renderQTab()}

@@ -1023,6 +1023,11 @@ body[data-tab="agenda"] .agtab{display:flex;flex-direction:column;gap:14px;max-w
 .ag-day i{font-style:normal;font-size:12px;line-height:1;color:var(--lav);min-height:12px;letter-spacing:1px}
 .ag-day.today{background:var(--lav);color:#fff}.ag-day.today small,.ag-day.today i{color:#fff}
 .ag-day.sel{box-shadow:0 0 0 2px var(--lav)}
+.ag-filters{display:flex;flex-wrap:wrap;gap:8px}
+.ag-filter{max-width:100%;min-height:36px;padding:6px 13px;border:1px solid var(--lav);border-radius:999px;background:#fff;color:var(--ink2);font:inherit;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ag-filter[aria-pressed="true"]{background:var(--lav-soft);color:var(--ink)}
+.ag-filter[aria-pressed="false"]{border-color:transparent;text-decoration:line-through}
+.ag-filter:focus-visible{outline:2px solid var(--lav);outline-offset:2px}
 .ag-list{display:flex;flex-direction:column;gap:16px}
 .ag-g h3{margin:0 4px 8px;font-family:var(--font-d);font-weight:600;font-size:17px}
 .ag-g{scroll-margin-top:20px}
