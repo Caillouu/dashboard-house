@@ -1306,7 +1306,8 @@
     [/\bsoirees?\b/,'🎉'],
     [/\b(?:foot|aja)\b/,'⚽'],
     [/\bcombats?\b/,'🥊'],
-    [/\bweek(?:[\s‑–-]+)?ends?\b/,'📅']
+    [/\bweek(?:[\s‑–-]+)?ends?\b/,'🚗'],
+    [/\b(?:voyages?|vacances?)\b/,'☀️']
   ];
   function eventTitle(e,fallback){
     var title=EVN[e.id]||e.summary||fallback;
