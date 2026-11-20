@@ -1,10 +1,10 @@
-"""Test de fumée de l'app, sans Google : le script Apps Script est simulé.
+"""Test de fumée de la PWA avec l’API Vercel simulée.
 
 Usage (depuis la racine du dépôt) :
     pip install playwright && python -m playwright install chromium
     python tools/smoke_test.py
 
-Le test sert l'app en local, se connecte avec un faux code, parcourt les onglets,
+Le test compile la PWA, la sert en local, parcourt les onglets après connexion,
 ajoute des articles de courses, ouvre la page des quêtes, puis enregistre des captures
 dans tools/out/. Il échoue si la page affiche une erreur JavaScript.
 """
@@ -15,7 +15,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'tools', 'out')
 os.makedirs(OUT, exist_ok=True)
 PORT = 8765
-FAKE_API = 'https://script.google.com/macros/s/AKfycbFAKEfakeFAKEfake1234567890/exec'
 FAKE_CODE = 'code-de-test-123'
 
 # Données d'exemple, au format renvoyé par le script (lignes brutes du Sheet, sans l'en-tête)
@@ -47,30 +46,47 @@ state['voyages'] = [
 ]
 
 
+revisions = {}
+receipts = {}
+settings = {'hiddenEvents': [], 'eventNames': {}}
+
 def handle(route):
     body = json.loads(route.request.post_data)
-    if body.get('k') != FAKE_CODE:
-        r = {'ok': False, 'error': 'auth'}
-    elif body['a'] == 'load':
-        r = {'ok': True, 'sheets': state, 'settings': {'hiddenEvents': [], 'eventNames': {}},
-             'people': {'p1': 'Personne A', 'p2': 'Personne B'},
-             'weather': {'city': 'Paris', 'temp': 7.2, 'cond': 'partly', 'label': 'Éclaircies', 'isDay': True, 'low': 4, 'high': 9},
-             'events': [{'id': 'e1', 'summary': 'Vétérinaire', 'start': {'dateTime': (datetime.date.today() + datetime.timedelta(days=1)).strftime('%Y-%m-%dT18:00:00Z')}}]}
-    elif body['a'] == 'put':
-        rows = state[body['t']]
-        for i, x in enumerate(rows):
-            if x[0] == body['row'][0]:
-                rows[i] = body['row']
-                break
+    action = body['a']
+    status = 200
+    if action == 'login':
+        r = {'ok': body.get('code') == FAKE_CODE, 'member': body.get('member')}
+    elif action == 'load':
+        r = {'ok': True, 'sheets': state, 'settings': settings, 'revisions': revisions,
+             'people': {'p1': 'Personne A', 'p2': 'Personne B'}, 'member': 'p1'}
+    elif action == 'weather':
+        r = {'ok': True, 'weather': {'city': 'Paris', 'temp': 7.2, 'cond': 'partly',
+             'label': 'Éclaircies', 'isDay': True, 'low': 4, 'high': 9}}
+    elif action == 'agenda':
+        r = {'ok': True, 'calendars': [{'id': 'c1', 'name': 'Maison'}],
+             'events': [{'id': 'e1', 'summary': 'Vétérinaire', 'calendars': ['c1'],
+                         'start': {'dateTime': _d(1) + 'T18:00:00Z'}}]}
+    elif action in ('put', 'del', 'setting'):
+        key = 'settings:' + body['name'] if action == 'setting' else body['t'] + ':' + body['id']
+        op_id = body['operationId']
+        if op_id in receipts:
+            r = receipts[op_id]
+        elif body['revision'] != revisions.get(key, 0):
+            status, r = 409, {'ok': False, 'error': 'conflict'}
         else:
-            rows.append(body['row'])
-        r = {'ok': True}
-    elif body['a'] == 'del':
-        state[body['t']] = [x for x in state[body['t']] if x[0] != body['id']]
-        r = {'ok': True}
+            revision = revisions[key] = body['revision'] + 1
+            if action == 'setting':
+                settings[body['name']] = body['value']
+            elif action == 'del':
+                state[body['t']] = [row for row in state[body['t']] if row[0] != body['id']]
+            else:
+                rows = state[body['t']]
+                index = next((i for i, row in enumerate(rows) if row[0] == body['id']), len(rows))
+                rows[index:index + 1] = [body['row']]
+            r = receipts[op_id] = {'ok': True, 'revision': revision}
     else:
         r = {'ok': True}
-    route.fulfill(status=200, content_type='application/json', body=json.dumps(r))
+    route.fulfill(status=status, content_type='application/json', body=json.dumps(r))
 
 
 class _Scope:
@@ -101,7 +117,8 @@ def _pick(page, day):
 
 
 def main():
-    srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(PORT), '-d', ROOT],
+    subprocess.run(['npm', 'run', 'build'], cwd=ROOT, check=True)
+    srv = subprocess.Popen([sys.executable, '-m', 'http.server', str(PORT), '-d', os.path.join(ROOT, 'dist')],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1)
     errors = []
@@ -113,10 +130,10 @@ def main():
                 page = ctx.new_page()
                 page.on('pageerror', lambda e: errors.append(str(e)))
                 page.on('console', lambda m: errors.append(m.text) if m.type == 'error' else None)
-                page.route('https://script.google.com/**', handle)
-                page.goto(f'http://localhost:{PORT}/#setup={FAKE_API}')
+                page.route('**/api/dashboard', handle)
+                page.goto(f'http://localhost:{PORT}/')
                 page.fill('#login-code', FAKE_CODE)
-                page.click('#login-go')
+                page.get_by_role('button', name='Entrer', exact=True).click()
                 page.wait_for_timeout(1000)
                 # vue simple par défaut sur téléphone, détaillée sur ordinateur
                 assert page.get_attribute('body', 'data-view') == ('simple' if name == 'mobile' else 'detail')
@@ -494,24 +511,28 @@ def main():
                     page.screenshot(path=f'{OUT}/{name}-voyages-apres.png')
                 ctx.close()
 
-            # Sécurité : un lien #setup= ne doit pas rediriger l'app vers un autre script
-            # en gardant le code d'accès (il serait envoyé à ce script).
-            OTHER = 'https://script.google.com/macros/s/AKfycbAUTREautreAUTRE0987654321/exec'
+            # Après la première ouverture en ligne, la PWA redémarre sans réseau.
             ctx = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
-            page = ctx.new_page(); page.route('https://script.google.com/**', handle)
-            page.goto(f'http://localhost:{PORT}/#setup={FAKE_API}')
-            page.fill('#login-code', FAKE_CODE); page.click('#login-go'); page.wait_for_timeout(1200)
-            assert page.is_hidden('#login'), 'connexion initiale'
-            page.on('dialog', lambda d: d.dismiss())          # on refuse le changement
-            page.goto(f'http://localhost:{PORT}/#setup={OTHER}'); page.wait_for_timeout(1200)
-            assert page.evaluate("localStorage.getItem('maison-api')") == FAKE_API, 'refus : le script ne change pas'
-            assert page.evaluate("localStorage.getItem('maison-key')") == FAKE_CODE, 'refus : la session est gardée'
-            page2 = ctx.new_page(); page2.route('https://script.google.com/**', handle)
-            page2.on('dialog', lambda d: d.accept())          # on accepte le changement
-            page2.goto(f'http://localhost:{PORT}/#setup={OTHER}'); page2.wait_for_timeout(1200)
-            assert page2.evaluate("localStorage.getItem('maison-api')") == OTHER, 'accepté : le script change'
-            assert page2.evaluate("localStorage.getItem('maison-key')") is None, 'accepté : le code est effacé, jamais envoyé au nouveau script'
-            assert page2.is_visible('#login'), 'accepté : le code est redemandé'
+            page = ctx.new_page()
+            page.on('pageerror', lambda e: errors.append(str(e)))
+            page.route('**/api/dashboard', handle)
+            page.goto(f'http://localhost:{PORT}/#courses')
+            page.fill('#login-code', FAKE_CODE)
+            page.get_by_role('button', name='Entrer', exact=True).click()
+            page.wait_for_selector('.login-card', state='hidden')
+            page.wait_for_function('navigator.serviceWorker.controller !== null')
+            assert page.evaluate("localStorage.getItem('maison-key')") is None, 'le code ne doit pas être stocké'
+            ctx.set_offline(True)
+            page.reload()
+            page.locator('#c-title2').fill('Pain hors ligne')
+            page.locator('#c-title2').press('Enter')
+            page.get_by_text('Pain hors ligne', exact=True).filter(visible=True).wait_for()
+            assert all(row[2] != 'Pain hors ligne' for row in state['courses'])
+            page.reload()
+            page.get_by_text('Pain hors ligne', exact=True).filter(visible=True).wait_for()
+            ctx.set_offline(False)
+            page.wait_for_function("Object.keys(localStorage).every(key => !key.startsWith('maison-vercel-op:'))")
+            assert sum(row[2] == 'Pain hors ligne' for row in state['courses']) == 1
             ctx.close()
             browser.close()
     finally:

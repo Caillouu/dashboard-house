@@ -80,7 +80,7 @@ function load_() {
   var people = { p1: String(props.getProperty('PERSON_1') || '').slice(0, 30), p2: String(props.getProperty('PERSON_2') || '').slice(0, 30) };
   var res = { sheets: sheets, settings: readSettings_(ss), people: people, weather: null, events: null };
   try { res.weather = weather_(); } catch (e) { console.warn(e); }
-  try { res.events = events_(); } catch (e) { console.warn(e); res.calError = true; }
+  try { var agenda = events_(); res.events = agenda.events; res.calendars = agenda.calendars; } catch (e) { console.warn(e); res.calError = true; }
   return res;
 }
 function nonEmpty_(x) { return String(x == null ? '' : x).trim() !== ''; }
@@ -221,7 +221,7 @@ function newId_() { return 'g' + Date.now().toString(36) + Math.floor(Math.rando
 /* ---------- Agenda (lecture seule, strict minimum) ---------- */
 function events_() {
   var cache = CacheService.getScriptCache();
-  var hit = cache.get('events');
+  var hit = cache.get('events-v2');
   if (hit) return JSON.parse(hit);
   var ids = (PropertiesService.getScriptProperties().getProperty('CALENDAR_IDS') || '')
     .split(',').map(function (s) { return s.trim(); }).filter(Boolean);
@@ -229,27 +229,43 @@ function events_() {
   var now = new Date();
   var start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   var end = new Date(start.getTime() + 35 * 864e5);
-  var out = [], seen = {};
+  var out = [], calendars = [], seen = Object.create(null);
+  ids = ids.filter(function (id, i) { return ids.indexOf(id) === i; });
   ids.forEach(function (id) {
     var c = CalendarApp.getCalendarById(id);
     if (!c) { console.warn('Agenda introuvable : ' + id); return; }
+    var calendarId = shortHash_(id);
+    calendars.push({ id: calendarId, name: calendarLabel_(c.getName(), calendars.length + 1) });
     c.getEvents(start, end).forEach(function (ev) {
       var allDay = ev.isAllDayEvent();
       var st = allDay ? { date: Utilities.formatDate(ev.getAllDayStartDate(), tz, 'yyyy-MM-dd') }
                       : { dateTime: ev.getStartTime().toISOString() };
       var title = String(ev.getTitle() || '').slice(0, 120);
       var key = title + '|' + (st.date || st.dateTime);
-      if (seen[key]) return;
-      seen[key] = 1;
-      out.push({ id: shortHash_(ev.getId() + '|' + (st.date || st.dateTime)), summary: title, start: st });
+      if (seen[key]) {
+        if (seen[key].calendars.indexOf(calendarId) < 0) seen[key].calendars.push(calendarId);
+        return;
+      }
+      var event = { id: shortHash_(ev.getId() + '|' + (st.date || st.dateTime)), summary: title, start: st, calendars: [calendarId] };
+      seen[key] = event;
+      out.push(event);
     });
   });
   out.sort(function (a, b) {
     return (a.start.dateTime || a.start.date + 'T00:00') < (b.start.dateTime || b.start.date + 'T00:00') ? -1 : 1;
   });
-  out = out.slice(0, 80);
-  cache.put('events', JSON.stringify(out), 300);
-  return out;
+  var agenda = { events: out.slice(0, 80), calendars: calendars };
+  cache.put('events-v2', JSON.stringify(agenda), 300);
+  return agenda;
+}
+function calendarLabel_(name, position) {
+  var label = String(name || '').trim()
+    .replace(/^(?:(?:mon|ma|mes|le|la|les|my|the)\s+)?(?:agenda|calendrier|calendar)\b\s*[:–—-]?\s*(?:(?:de|du|des)\s+|d['’])?/i, '')
+    .replace(/\s+(?:agenda|calendrier|calendar)$/i, '')
+    .replace(/^([^@\s]+)@[^@\s]+$/, '$1')
+    .replace(/^(?:personnel|personnelle)$/i, 'Perso')
+    .trim();
+  return label ? (label.charAt(0).toUpperCase() + label.slice(1)).slice(0, 60) : 'Agenda ' + position;
 }
 function shortHash_(s) {
   var d = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, s, Utilities.Charset.UTF_8);
@@ -258,29 +274,61 @@ function shortHash_(s) {
 
 /* ---------- Météo (Open-Meteo, seules les coordonnées sont envoyées) ---------- */
 function weather_() {
-  var cache = CacheService.getScriptCache();
-  var hit = cache.get('weather');
-  if (hit) return JSON.parse(hit);
   var p = PropertiesService.getScriptProperties();
   var lat = Number(p.getProperty('WEATHER_LAT') || 48.8566), lon = Number(p.getProperty('WEATHER_LON') || 2.3522);
   var city = String(p.getProperty('WEATHER_CITY') || 'Paris').slice(0, 40);
-  var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-    '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FParis&forecast_days=1';
-  var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: false });
-  if (res.getResponseCode() !== 200) return null;
-  var j = JSON.parse(res.getContentText());
-  var code = j.current.weather_code, cond, label;
-  if (code === 0) { cond = 'clear'; label = j.current.is_day ? 'Ensoleillé' : 'Dégagé'; }
+  var primary = weatherAt_(lat, lon, city);
+  var auxerre = weatherAt_(47.7982, 3.5738, 'Auxerre');
+  return Object.assign({ city: city }, primary, { auxerre: auxerre });
+}
+
+function weatherAt_(lat, lon, city) {
+  var cache = CacheService.getScriptCache();
+  var key = ['weather-v3', lat, lon, city].join(':');
+  var hit = cache.get(key);
+  if (hit) return JSON.parse(hit);
+  try {
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+      '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,weather_code&hourly=temperature_2m,weather_code,is_day&timezone=Europe%2FParis&forecast_days=5';
+    var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: false });
+    if (res.getResponseCode() !== 200) return null;
+    var j = JSON.parse(res.getContentText());
+    var hoursByDate = {};
+    j.hourly.time.forEach(function (time, i) {
+      var hour = Number(time.slice(11, 13));
+      if ([8, 12, 16, 20].indexOf(hour) === -1) return;
+      var date = time.slice(0, 10);
+      if (!hoursByDate[date]) hoursByDate[date] = [];
+      hoursByDate[date].push(Object.assign({ hour: hour, temp: j.hourly.temperature_2m[i] },
+        weatherCondition_(j.hourly.weather_code[i], !!j.hourly.is_day[i])));
+    });
+    var days = j.daily.time.map(function (date, i) {
+      var hours = hoursByDate[date] || [];
+      var noon = hours.find(function (slot) { return slot.hour === 12; });
+      return Object.assign({ date: date, city: city, temp: noon ? noon.temp : null, hours: hours,
+        low: j.daily.temperature_2m_min[i], high: j.daily.temperature_2m_max[i] },
+        weatherCondition_(j.daily.weather_code[i], true));
+    });
+    var w = Object.assign({}, days[0], weatherCondition_(j.current.weather_code, !!j.current.is_day),
+      { temp: j.current.temperature_2m, days: days });
+    cache.put(key, JSON.stringify(w), 1800);
+    return w;
+  } catch (e) {
+    console.warn('Météo indisponible pour ' + city + ': ' + e);
+    return null;
+  }
+}
+
+function weatherCondition_(code, isDay) {
+  var cond, label;
+  if (code === 0) { cond = 'clear'; label = isDay ? 'Ensoleillé' : 'Dégagé'; }
   else if (code <= 2) { cond = 'partly'; label = 'Éclaircies'; }
   else if (code === 3) { cond = 'cloudy'; label = 'Nuageux'; }
   else if (code === 45 || code === 48) { cond = 'fog'; label = 'Brouillard'; }
   else if ((code >= 71 && code <= 77) || code === 85 || code === 86) { cond = 'snow'; label = 'Neige'; }
   else if (code >= 95) { cond = 'storm'; label = 'Orage'; }
   else { cond = 'rain'; label = 'Pluie'; }
-  var w = { city: city, temp: j.current.temperature_2m, cond: cond, label: label, isDay: !!j.current.is_day,
-            low: j.daily.temperature_2m_min[0], high: j.daily.temperature_2m_max[0] };
-  cache.put('weather', JSON.stringify(w), 1800);
-  return w;
+  return { cond: cond, label: label, isDay: isDay };
 }
 
 function json_(o) {
@@ -303,6 +351,7 @@ function verifier() {
     var c = CalendarApp.getCalendarById(id);
     console.log(c ? '✅ Agenda n°' + (i + 1) + ' accessible' : '❌ Agenda n°' + (i + 1) + ' introuvable : accepte le partage reçu par e-mail sur le compte dédié');
   });
-  CacheService.getScriptCache().removeAll(['events', 'weather']);
-  try { console.log(weather_() ? '✅ Météo OK' : '❌ Météo indisponible'); } catch (e) { console.log('❌ Météo : ' + e); }
+  var weatherKey = ['weather-v3', Number(p.getProperty('WEATHER_LAT') || 48.8566), Number(p.getProperty('WEATHER_LON') || 2.3522), String(p.getProperty('WEATHER_CITY') || 'Paris').slice(0, 40)].join(':');
+  CacheService.getScriptCache().removeAll(['events', weatherKey, 'weather-v3:47.7982:3.5738:Auxerre']);
+  try { var weather = weather_(); console.log(typeof weather.temp === 'number' ? '✅ Météo principale OK' : '❌ Météo principale indisponible'); console.log(weather.auxerre ? '✅ Météo Auxerre OK' : '❌ Météo Auxerre indisponible'); } catch (e) { console.log('❌ Météo : ' + e); }
 }

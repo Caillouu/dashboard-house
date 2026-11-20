@@ -1,6 +1,6 @@
-/* Dashboard Maison — app autonome.
-   Les données vivent dans le Google Sheet de la maison. L'app ne parle qu'au script Google (Apps Script)
-   du Sheet, avec un code d'accès. Aucun identifiant (Sheet, agenda, code) n'est écrit dans ce fichier. */
+import { api, APIError, cacheKey, sessionKey, readQueue, saveOperation, removeOperation, isQueueChange, target } from './src/transport.ts'
+import { setupControls, showLogin, hideLogin, showSync } from './src/controls.tsx'
+
 (function(){
   'use strict';
   /* Jamais affichée à l'intérieur d'un autre site : GitHub Pages ne permet pas d'envoyer
@@ -28,72 +28,43 @@
   function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
   function safeUrl(u){u=String(u||'').trim();if(!u)return '';if(!/^https?:\/\//i.test(u))u='https://'+u;return /^https?:\/\/[^\s<>"']+$/i.test(u)?u:''}
 
-  /* ---- Connexion au script Google ---- */
-  var LS_API='maison-api',LS_KEY='maison-key',CK='maison-cache-v2';
-  var API_RE=/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/;
+  var CK=cacheKey,LS_KEY=sessionKey;
   function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
   function lsSet(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
-  var API=lsGet(LS_API),KEY=lsGet(LS_KEY);
-  if(API&&!API_RE.test(API))API=null;
-  /* accepte l'adresse du script seule, encodée, ou le lien d'installation complet */
-  function normApi(v){v=String(v||'').trim();var m=v.match(/#setup=(.+)$/);if(m)v=m[1];
-    for(var i=0;i<2&&/%2F/i.test(v);i++){try{v=decodeURIComponent(v)}catch(e){break}}
-    v=v.replace(/\s+/g,'').replace(/\/exec[?#].*$/,'/exec');return v}
-  (function(){ /* lien d'installation : …/#setup=<adresse du script> (le # n'est jamais envoyé à un serveur) */
-    var m=location.hash.match(/^#setup=(.+)$/);
-    if(m){var u=normApi(m[1]);
-      try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
-      if(!API_RE.test(u))return;
-      if(API&&u!==API){
-        /* changer de script en gardant le code reviendrait à l'envoyer à ce nouveau script :
-           on demande confirmation et on redemande le code dans tous les cas */
-        if(!confirm('Ce lien veut connecter l\'application à un AUTRE script que celui enregistré.\n\nN\'accepte que si tu viens de créer ce lien toi-même. Le code d\'accès sera redemandé.'))return;
-        KEY=null;lsSet(LS_KEY,null);lsSet(CK,null);
-      }
-      API=u;lsSet(LS_API,u)}
-  })();
+  var KEY=lsGet(LS_KEY),sessionEpoch=0,revisions={};
 
-  function AuthError(code){this.code=code}
-  async function api(action,data){
-    if(!API||!KEY)throw new AuthError('auth');
-    var ctl=new AbortController(),tm=setTimeout(function(){ctl.abort()},30000);
+  function lockSession(message){
+    KEY=null;sessionEpoch++;lsSet(LS_KEY,null);clearTimeout(cacheT);
+    S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};
+    cal={status:'loading',events:[]};W=null;HID=[];EVN={};if(typeof agHidden!=='undefined')agHidden.clear();sig='';fromCache=false;
+    if(typeof weatherSlide!=='undefined'){weatherSlide=0;weatherDates=[null,null];weatherTouch=null}
+    vOpen=null;render();renderCal();renderWeather();showLogin(message);
+  }
+  async function logout(){
+    if(isOffline()){alert('Reconnecte cet appareil pour le déconnecter du foyer.');return}
+    var pending=readQueue();
+    if(!confirm(pending.length?'Déconnecter cet appareil et effacer ses modifications locales ?':'Déconnecter cet appareil ?'))return;
     try{
-      var res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({k:KEY,a:action},data||{})),
-        redirect:'follow',credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',signal:ctl.signal});
-      var j=await res.json();
-      if(!j||j.ok!==true){if(j&&(j.error==='auth'||j.error==='locked'))throw new AuthError(j.error);var er=new Error((j&&j.error)||'erreur');er.server=true;throw er}
-      return j;
-    }finally{clearTimeout(tm)}
-  }
-  function showLogin(msg){
-    var L=$('login');L.hidden=false;
-    $('login-url').hidden=!!API;$('login-url').required=!API;
-    $('login-err').textContent=msg||'';
-    setTimeout(function(){(API?$('login-code'):$('login-url')).focus()},50);
-  }
-  function logout(msg){
-    KEY=null;lsSet(LS_KEY,null);lsSet(CK,null);OB=[];lsSet(OB_KEY,null);
-    S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};cal={status:'loading',events:[]};W=null;HID=[];EVN={};sig='';
-    vOpen=null;render();renderCal();renderWeather();
-    showLogin(msg);
+      await api('logout');
+      pending.forEach(removeOperation);
+      lsSet(CK,null);lsSet(LS_KEY,null);location.reload();
+    }catch(e){alert('La déconnexion a échoué. Réessaie une fois la connexion rétablie.')}
   }
   function authFail(e){
-    if(e&&e.code==='locked'){logout('Trop d\'essais ratés. Réessaie dans 15 minutes.');return true}
-    if(e&&e.code==='auth'){logout(KEY?'Code d\'accès refusé ou changé.':'');return true}
+    if(e instanceof APIError&&e.code==='auth'){lockSession('Reconnecte-toi pour reprendre la synchronisation.');return true}
     return false;
   }
-  $('login-form').addEventListener('submit',async function(e){
-    e.preventDefault();
-    var u=normApi($('login-url').value),c=$('login-code').value;
-    if(!API){if(!API_RE.test(u)){$('login-err').textContent='Adresse du script invalide.';return}API=u;lsSet(LS_API,u)}
-    KEY=c;$('login-go').disabled=true;$('login-err').textContent='';
-    try{var j=await api('load');lsSet(LS_KEY,c);$('login-code').value='';$('login').hidden=true;applyLoad(j);startPolling()}
-    catch(err){KEY=null;
-      $('login-err').textContent=err&&err.code==='locked'?'Trop d\'essais ratés. Réessaie dans 15 minutes.':err&&err.code==='auth'?'Code incorrect.':'Le script ne répond pas. Vérifie ta connexion.'}
-    $('login-go').disabled=false;
+  setupControls({
+    login:async function(member,code){
+      await api('login',{member:member,code:code});
+      var j=await api('load');
+      KEY=j.member;lsSet(LS_KEY,KEY);hideLogin();
+      applyLoad(j);startPolling();flush();refreshIntegrations(true);
+    },
+    resolve:resolveOperation
   });
 
-  /* ---- Google Sheet : conversion lignes <-> objets ---- */
+  /* ---- Adaptation des enregistrements aux écrans existants ---- */
   var SHT={
     routines:{cols:['id','group','emoji','title','lastDone','everyN','everyUnit','_t']},
     shop:{cols:['id','emoji','title','budget','who','urgency','link','note','done','_t']},
@@ -144,81 +115,153 @@
       if(typeof v==='number')return v;
       return v==null?'':String(v)})}
 
-  /* ---- Chargement et écritures ---- */
-  var sig='',busy=false,Q=Promise.resolve(),soonT=null,pollT=null;
+  /* Les données du foyer chargent indépendamment des services externes. */
+  var sig='',busy=false,soonT=null,pollT=null;
+  var integrationAt=0;
+  function refreshIntegrations(force){
+    if(!KEY||(!force&&Date.now()-integrationAt<60000))return;
+    integrationAt=Date.now();var epoch=sessionEpoch;
+    api('agenda').then(function(j){
+      if(epoch!==sessionEpoch)return;
+      cal={status:'ok',events:j.events,calendars:j.calendars};renderCal();render();cacheNow();
+    }).catch(function(){if(epoch===sessionEpoch&&cal.status!=='ok'){cal={status:'error',events:[]};renderCal();render()}});
+    api('weather').then(function(j){
+      if(epoch!==sessionEpoch)return;
+      W=j.weather;renderWeather();render();cacheNow();
+    }).catch(function(){});
+  }
   function applyLoad(j){
-    var s=JSON.stringify([j.sheets,j.settings,j.events,j.weather,j.calError||null,j.people||null]);
-    if(fromCache){fromCache=false;$('banner').innerHTML=''}
+    revisions=j.revisions||{};
+    var s=JSON.stringify([j.sheets,j.settings,j.people,readQueue()]);
+    if(fromCache)fromCache=false;
     loaded.projects=loaded.routines=loaded.shop=loaded.courses=loaded.voyages=true;
-    V_OLD=!(j.sheets&&Array.isArray(j.sheets.voyages)); /* ancien script : pas encore d'onglet Voyages */
+    V_OLD=false;
     if(s===sig)return;sig=s;
     setPeople(j.people);
-    Object.keys(SHT).forEach(function(k){var list=[];
-      ((j.sheets&&j.sheets[k])||[]).forEach(function(r,i){if(!Array.isArray(r))return;var o=fromRow(k,r,i);if(!o.title||!o.id)return;list.push(o)});
-      S[k]=list});
-    var st=j.settings||{};HID=Array.isArray(st.hiddenEvents)?st.hiddenEvents.map(String):[];EVN=(st.eventNames&&typeof st.eventNames==='object')?st.eventNames:{};
-    overlayOutbox();
-    W=j.weather||null;
-    if(Array.isArray(j.events))cal={status:'ok',events:j.events};else if(cal.status!=='ok')cal={status:'error',events:[]};
-    renderWeather();renderCal();render();
+    Object.keys(SHT).forEach(function(k){
+      S[k]=j.sheets[k].map(function(r,i){return fromRow(k,r,i)}).filter(function(row){return row.id&&row.title});
+    });
+    var st=j.settings||{};
+    HID=Array.isArray(st.hiddenEvents)?st.hiddenEvents.map(String):[];
+    EVN=st.eventNames||{};
+    overlayOutbox();renderCal();render();cacheNow();syncNote();
   }
   async function load(){
-    if(busy||!KEY)return;
-    if(isOffline()){syncNote();return}
-    busy=true;lastLoad=Date.now();var started=Date.now();
-    try{var j=await api('load');if(started<lastWriteAt||flushing){busy=false;soon();return}applyLoad(j);flush()}
-    catch(e){if(!authFail(e)){if(cal.status!=='ok'){cal={status:'error',events:[]};renderCal()}if(OB.length)syncNote();else if(!fromCache)$('banner').innerHTML='<div class="note">Réseau lent ou absent · dernières données</div>'}}
-    busy=false;
+    if(busy||!KEY||isOffline()){syncNote();return false}
+    busy=true;lastLoad=Date.now();var started=writes,epoch=sessionEpoch;
+    try{
+      var j=await api('load');
+      if(epoch!==sessionEpoch)return false;
+      if(started!==writes||flushing){soon();return false}
+      KEY=j.member;lsSet(LS_KEY,KEY);applyLoad(j);refreshIntegrations(false);
+      return true;
+    }catch(e){
+      if(epoch===sessionEpoch&&!authFail(e))syncNote('Connexion au serveur indisponible · données locales');
+      return false;
+    }finally{busy=false}
   }
   var lastLoad=0;
-  function startPolling(){clearInterval(pollT);pollT=setInterval(function(){if(document.hidden)return;var every=(TAB==='courses'||cOpen)?15000:60000;if(Date.now()-lastLoad>=every-1000)load()},5000)}
-  /* ---- File d'attente hors ligne (« outbox ») ----
-     Chaque modification est d'abord enregistrée sur l'appareil, puis envoyée au script dès que le réseau
-     répond. Si le réseau coupe (en magasin…), rien n'est perdu : l'envoi reprend tout seul. */
-  var OB_KEY='maison-outbox',OB=(function(){try{var x=JSON.parse(lsGet(OB_KEY)||'[]');return Array.isArray(x)?x:[]}catch(e){return []}})();
-  var flushing=false,retryT=null,retryMs=3000,lastWriteAt=0;
-  function obSave(){lsSet(OB_KEY,OB.length?JSON.stringify(OB):null);syncNote()}
+  function startPolling(){clearInterval(pollT);pollT=setInterval(function(){
+    if(document.hidden)return;
+    var every=(TAB==='courses'||cOpen)?15000:60000;
+    if(Date.now()-lastLoad>=every-1000)load().then(flush);
+  },5000)}
+
+  /* Une clé locale par modification évite que deux onglets écrasent leur file respective. */
+  var flushing=false,retryT=null,retryMs=1500,writes=0,visiblePending=new Set();
   function enqueue(op){
-    OB=OB.filter(function(o){return op.a==='setting'?!(o.a==='setting'&&o.name===op.name):!(o.a!=='setting'&&o.t===op.t&&o.id===op.id)});
-    OB.push(op);obSave();flush();
+    var key=target(op),queue=readQueue();
+    var prior=queue.filter(function(item){return target(item)===key&&visiblePending.has(item.operationId)}).at(-1);
+    try{
+      var operationId=crypto.randomUUID();
+      saveOperation(Object.assign({},op,{
+        revision:prior?prior.revision+1:(revisions[key]||0),
+        operationId:operationId,
+        time:Math.max(Date.now(),(queue.at(-1)?.time||0)+1),
+        rejected:prior?.rejected?'conflict':undefined,
+      }));
+      visiblePending.add(operationId);
+    }catch(e){syncNote('Stockage local indisponible. Cette modification ne peut pas être conservée.');return}
+    syncNote();flush();
   }
   function isOffline(){return navigator.onLine===false}
+  function retry(){
+    clearTimeout(retryT);
+    retryT=setTimeout(flush,retryMs);
+    retryMs=Math.min(retryMs*2,60000);
+  }
+  async function drain(){
+    var op;
+    while(KEY&&!isOffline()&&(op=readQueue().find(function(item){return !item.rejected}))){
+      try{
+        var result=await api(op.a,op);
+        revisions[target(op)]=result.revision;
+        writes++;visiblePending.delete(op.operationId);
+        removeOperation(op);retryMs=1500;cacheNow();
+      }catch(e){
+        if(e instanceof APIError&&[400,409,413].includes(e.status)){
+          var key=target(op);
+          readQueue().filter(function(item){return target(item)===key&&!item.rejected}).forEach(function(item){
+            saveOperation(Object.assign({},item,{rejected:e.code==='conflict'?'conflict':'invalid'}));
+          });
+          sig='';continue;
+        }
+        throw e;
+      }
+    }
+  }
   async function flush(){
-    if(flushing||!KEY||!OB.length)return;
-    if(isOffline()){syncNote();return}
+    if(flushing||!KEY||isOffline()||!readQueue().some(function(op){return !op.rejected}))return;
     flushing=true;clearTimeout(retryT);syncNote();
     try{
-      while(OB.length){
-        var op=OB[0],payload=op.a==='put'?{t:op.t,row:op.row}:op.a==='del'?{t:op.t,id:op.id}:{name:op.name,value:op.value};
-        try{await api(op.a,payload)}
-        catch(e){if(!e||!e.server)throw e;fail()} /* refus du script : on n'insiste pas sur cette modif */
-        OB=OB.filter(function(x){return x!==op});lastWriteAt=Date.now();obSave();retryMs=3000;
-      }
+      if(navigator.locks)await navigator.locks.request('dashboard-house-sync',drain);
+      else await drain();
       soon();
     }catch(e){
-      if(!authFail(e)){clearTimeout(retryT);retryT=setTimeout(flush,retryMs);retryMs=Math.min(retryMs*2,60000)}
-    }
-    flushing=false;syncNote();
+      if(!authFail(e))retry();
+    }finally{flushing=false;syncNote()}
   }
-  function syncNote(){
-    var n=OB.length,off=isOffline(),txt=n?('⏳ '+n+' modif'+(n>1?'s':'')+' en attente'+(off?' · hors ligne, enregistré sur l\'appareil':' · envoi…')):(off?'Hors ligne · dernières données':'');
-    var b=$('banner');if(b){if(txt)b.innerHTML='<div class="note" data-sync>'+esc(txt)+'</div>';else if(b.querySelector('[data-sync]'))b.innerHTML=''}
-    var cn=$('cv-net');if(cn){cn.textContent=n?(off?'Hors ligne · '+n+' en attente':'Envoi…'):(off?'Hors ligne':'');cn.hidden=!cn.textContent}
+  function syncNote(message){
+    var queue=KEY?readQueue():[],n=queue.filter(function(op){return !op.rejected}).length,off=isOffline();
+    var txt=n?(n+' modification'+(n===1?'':'s')+' en attente'+(off?' · hors ligne':'')):(off?'Hors ligne · dernières données':'');
+    var rejected=Array.from(new Map(queue.filter(function(op){return op.rejected}).map(function(op){return [target(op),op]})).values());
+    showSync({text:message||txt,rejected:rejected.map(function(op){
+      var key=target(op),parts=key.split(':'),item=S[parts[0]]?.find(function(item){return item.id===parts[1]});
+      return {operationId:op.operationId,label:op.row?.[2]||item?.title||(parts[0]==='settings'?'Réglage Agenda':'Modification '+parts[0])};
+    })});
+    var cn=$('cv-net');if(cn){cn.textContent=rejected.length?'Modification à vérifier':txt;cn.hidden=!cn.textContent}
+  }
+  async function resolveOperation(operationId,retryOperation){
+    var op=readQueue().find(function(item){return item.operationId===operationId});
+    if(!op)return;
+    if(!await load()){syncNote('Reconnecte-toi pour vérifier la dernière version du foyer.');return}
+    var key=target(op);
+    var rejected=readQueue().filter(function(item){return item.rejected&&target(item)===key});
+    if(retryOperation){
+      try{saveOperation(Object.assign({},op,{revision:revisions[key]||0,operationId:crypto.randomUUID(),time:Date.now(),rejected:undefined}))}
+      catch(e){syncNote('Impossible de conserver la modification sur cet appareil.');return}
+    }
+    rejected.forEach(removeOperation);sig='';load().then(flush);syncNote();
   }
   function overlayOutbox(){
-    OB.forEach(function(op){
+    visiblePending.clear();
+    readQueue().filter(function(op){return !op.rejected}).forEach(function(op){
+      visiblePending.add(op.operationId);
       if(op.a==='put'&&SHT[op.t]){var o=fromRow(op.t,op.row,0),L=S[op.t],i=L.findIndex(function(x){return x.id===o.id});if(i>=0)L[i]=o;else L.push(o)}
       else if(op.a==='del'&&SHT[op.t]){S[op.t]=S[op.t].filter(function(x){return x.id!==op.id})}
       else if(op.a==='setting'){if(op.name==='hiddenEvents')HID=op.value;else if(op.name==='eventNames')EVN=op.value}
     });
   }
-  function soon(){clearTimeout(soonT);soonT=setTimeout(load,2500)}
+  window.addEventListener('storage',function(e){
+    if(e.key===LS_KEY&&!e.newValue&&KEY){lockSession('');return}
+    if(KEY&&isQueueChange(e.key)){overlayOutbox();render();syncNote();load().then(flush)}
+  });
+  function soon(){clearTimeout(soonT);soonT=setTimeout(load,500)}
   function shWrite(k,o){enqueue({a:'put',t:k,id:o.id,row:toRow(k,o)});return Promise.resolve()}
   function shDel(k,id){enqueue({a:'del',t:k,id:id});return Promise.resolve()}
   function saveSetting(name,value){enqueue({a:'setting',name:name,value:JSON.parse(JSON.stringify(value))});return Promise.resolve()}
 
   function upd(key,id,data){var it=find(key,id);if(!it)return;Object.assign(it,data);render();return shWrite(key,it)}
-  function fail(){$('banner').innerHTML='<div class="note">Enregistrement impossible. Recharge la page.</div>'}
   function steps(o){return (o.steps||[]).map(function(x){return {t:x.t,done:!!x.done}})}
   /* Renommer une mini-quête : on touche son texte, il devient un champ. Entrée ou un clic ailleurs enregistre, Échap annule. */
   function stepRen(b){
@@ -463,7 +506,7 @@
   /* Kimchi réagit au moment, à la météo et au voyage — pas aux choses à faire (elles sont juste en dessous) */
   /* Vue simple : une carte « Aujourd'hui » (prochainement, à faire, quête principale, vacances) + 6 raccourcis */
   /* ---- Onglet Test : accueil « scène » — Kimchi dans un décor qui suit l'heure et la météo, une jauge arc-en-ciel, puis 4 lignes ---- */
-  function sceneMood(){var h=new Date().getHours(),c=W&&W.cond,night=W?W.isDay===false:(h>=20||h<7);
+  function sceneMood(weather, forecast){var h=forecast?12:new Date().getHours(),c=weather&&weather.cond,night=weather?weather.isDay===false:(h>=20||h<7);
     if(c==='rain'||c==='storm')return night?'night rain':'rain';if(c==='snow')return 'snow';
     if(night)return 'night';if(c==='cloudy'||c==='fog')return 'grey';if(h>=18)return 'dusk';return 'day'}
   /* Décor de la carte : soleil, nuages, pluie, neige ou étoiles selon la météo, et une colline pour Kimchi */
@@ -476,14 +519,72 @@
     if(mood==='snow')d+='<g fill="#fff" class="sc-rain"><circle cx="215" cy="80" r="2.5"/><circle cx="240" cy="86" r="2.5"/><circle cx="300" cy="92" r="2.5"/><circle cx="322" cy="84" r="2.5"/></g>';
     d+='<ellipse cx="290" cy="232" rx="150" ry="46" fill="'+(/night/.test(mood)?'#3B3374':mood==='snow'?'#F4F6FB':'#BFE8C9')+'"/>';
     return '<svg class="sc-svg" viewBox="0 0 360 230" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">'+d+'</svg>'}
+  var weatherSlide=0, weatherDates=[null,null], weatherTouch=null;
+  function weatherCard(slide){
+    var weather=slide===0?W:W&&W.auxerre;
+    var days=weather&&weather.days||[], date=weatherDates[slide];
+    var forecast=days.slice(1).find(function(day){return day.date===date});
+    var selected=forecast||weather, hours=selected&&selected.hours||[];
+    var noon=forecast&&hours.find(function(slot){return slot.hour===12});
+    var shown=noon?Object.assign({},forecast,noon):selected;
+    var mood=sceneMood(shown, forecast), c=shown&&shown.cond;
+    var hr=forecast?12:new Date().getHours(), night=/night/.test(mood);
+    var city=slide===1?'Auxerre':weather&&weather.city||'Météo locale';
+    var t=function(n){return Number.isFinite(n)?Math.round(n)+'°':'—'};
+    var dayName=function(value, long){
+      return cap(new Date(value+'T12:00:00').toLocaleDateString('fr-FR',{weekday:long?'long':'short',day:'numeric',month:long?'long':undefined}));
+    };
+    var title=!shown||!shown.cond?'Kimchi regarde le ciel…':c==='storm'?'Orage dehors, on reste au chaud ⛈️':c==='rain'?'Il pleut, parfait pour rester au chaud ☔':c==='snow'?'Il neige ! Kimchi colle son nez à la vitre ❄️':c==='fog'?'Brouillard, tout est tout doux 🌫️':night?'Nuit calme, Kimchi dort 🌙':c==='cloudy'?'Ciel gris, Kimchi fait la sieste ☁️':hr>=18?'Belle fin de journée 🌇':c==='partly'?'Quelques éclaircies, Kimchi est de bonne humeur 🌤️':'Grand soleil, Kimchi est ravie ☀️';
+    var heading=forecast?dayName(forecast.date,true)+' · Prévision à midi':days.length?"Aujourd’hui":'';
+    var wx=shown&&shown.cond
+      ?'<div class="sc-wx"><span class="sc-wic">'+wIcon(shown.cond,shown.isDay)+'</span><span class="sc-temp">'+t(shown.temp)+'</span><span class="sc-wl"><b>'+esc(shown.label)+'</b>'+esc(city)+' · '+t(shown.low)+' / '+t(shown.high)+'</span></div>'
+      :'<div class="sc-wx"><span class="sc-wl"><b>'+esc(city)+'</b>Météo indisponible</span></div>';
+    var h='<div class="sc-weather-expanded"><section class="scene '+mood+'" aria-label="'+esc('Météo : '+city)+'">'+sceneDeco(mood)+
+      '<div class="sc-weather-detail" aria-live="polite">'+(heading?'<span class="sc-weather-date">'+esc(heading)+'</span>':'')+wx+'</div>'+
+      '<div class="sc-txt"><h2>'+esc(title)+'</h2></div><img class="sc-k" src="assets/kimchi-anim.svg" alt="Kimchi"></section>';
+    if(hours.length){
+      h+='<ul class="sc-weather-hours" aria-label="Prévisions horaires">'+hours.map(function(slot){
+        var time=slot.hour+' h', label=time+', '+slot.label+', '+t(slot.temp);
+        return '<li aria-label="'+esc(label)+'"><span>'+time+'</span>'+wIcon(slot.cond,slot.isDay)+'<b>'+t(slot.temp)+'</b></li>';
+      }).join('')+'</ul>';
+    }
+    h+='</div>';
+    if(days.length>1){
+      h+='<div class="sc-weather-days" role="group" aria-label="Prévisions par jour">'+days.map(function(day,i){
+        var label=i===0?"Aujourd’hui":dayName(day.date,false);
+        var active=i===0?!forecast:forecast===day;
+        return '<button type="button" data-act="weather-day" data-id="'+(i===0?'':esc(day.date))+'" aria-pressed="'+active+'" aria-label="'+esc(label+', '+day.label+', minimum '+t(day.low)+', maximum '+t(day.high))+'">'+
+          '<span>'+esc(label)+'</span>'+wIcon(day.cond,day.isDay)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span></button>';
+      }).join('')+'</div>';
+    }
+    return h;
+  }
+  function weatherSlider(){
+    var names=W&&Object.prototype.hasOwnProperty.call(W,'auxerre')?[W.city||'Météo locale','Auxerre']:[];
+    if(!names.length)weatherSlide=0;
+    var panels=(names.length?names:['']).map(function(_,i){
+      return '<div class="sc-weather-slide"'+(i===weatherSlide?'':' inert')+'>'+weatherCard(i)+'</div>';
+    }).join('');
+    var dots=names.map(function(name,i){
+      return '<button type="button" data-act="weather-city" data-id="'+i+'" aria-label="'+esc(name)+'" aria-pressed="'+(weatherSlide===i)+'"></button>';
+    }).join('');
+    return '<div id="weather-slider"><div class="sc-weather-window"><div class="sc-weather-track" data-slide="'+weatherSlide+'">'+panels+'</div></div>'+
+      (dots?'<div class="sc-weather-dots" role="group" aria-label="Lieux météo">'+dots+'</div>':'')+'</div>';
+  }
+  function setWeatherSlide(next){
+    var panel=$('weather-slider');
+    if(!panel||next===weatherSlide)return;
+    var track=panel.querySelector('.sc-weather-track'), dots=panel.querySelectorAll('[data-act="weather-city"]');
+    if(!dots[next])return;
+    if(track.children[weatherSlide].contains(document.activeElement))dots[next].focus({preventScroll:true});
+    weatherSlide=next;
+    track.dataset.slide=next;
+    Array.from(track.children).forEach(function(slide,i){slide.inert=i!==next});
+    dots.forEach(function(dot,i){dot.setAttribute('aria-pressed',String(i===next))});
+  }
   function renderHub3(){var el=$('hub3');if(!el||TAB!=='home'||VIEW!=='simple')return;
-    var due=dueList(),td=iso(new Date()),done=S.routines.filter(function(r){return r.lastDone===td}).length,nt=nextTrip(),ts=nt&&tripState(nt),mood=sceneMood();
-    var hr=new Date().getHours(),c=W&&W.cond,night=/night/.test(mood);
-    /* Une seule phrase, sur la météo */
-    var title=!W?'Kimchi regarde le ciel…':c==='storm'?'Orage dehors, on reste au chaud ⛈️':c==='rain'?'Il pleut, parfait pour rester au chaud ☔':c==='snow'?'Il neige ! Kimchi colle son nez à la vitre ❄️':c==='fog'?'Brouillard, tout est tout doux 🌫️':night?'Nuit calme, Kimchi dort 🌙':c==='cloudy'?'Ciel gris, Kimchi fait la sieste ☁️':hr>=18?'Belle fin de journée 🌇':c==='partly'?'Quelques éclaircies, Kimchi est de bonne humeur 🌤️':'Grand soleil, Kimchi est ravie ☀️';
-    var t=function(n){return Math.round(n)+'°'};
-    var wx=W&&typeof W.temp==='number'?'<div class="sc-wx"><span class="sc-wic">'+wIcon(W.cond,W.isDay)+'</span><span class="sc-temp">'+t(W.temp)+'</span><span class="sc-wl"><b>'+esc(W.label||'')+'</b>'+esc(W.city||'')+(typeof W.low==='number'?' · '+t(W.low)+' / '+t(W.high):'')+'</span></div>':'';
-    var h='<section class="scene '+mood+'">'+sceneDeco(mood)+wx+'<div class="sc-txt"><h2>'+esc(title)+'</h2></div><img class="sc-k" src="assets/kimchi-anim.svg" alt="Kimchi"></section>';
+    var due=dueList(),nt=nextTrip(),ts=nt&&tripState(nt);
+    var h=weatherSlider();
     /* En ce moment : prochain événement, missions maison, quête principale, voyage */
     var rows='';
     mains3().forEach(function(m){var ss=m.steps||[],dn=ss.filter(function(x){return x.done}).length,id=esc(m.id);
@@ -491,7 +592,7 @@
         (ss.length?'<ul class="sc-list">'+ss.map(function(x,i){return '<li class="tq-step'+(x.done?' done':'')+'"><button class="chk" data-act="ps" data-id="'+id+'" data-i="'+i+'" aria-label="'+(x.done?'Décocher : ':'Terminer : ')+esc(x.t)+'">'+CHECK+'</button><button class="tq-st" data-act="proj-open" data-id="'+id+'">'+esc(x.t)+'</button></li>'}).join('')+'</ul>':'')+'</div>'});
     var qH=rows;rows='';
     if(cal.status==='ok'){var now=new Date(),e=cal.events.filter(function(x){return x&&HID.indexOf(x.id)<0}).map(function(x){return {e:x,i:evInfo(x)}}).filter(function(x){return x.i&&x.i.n>=0&&(x.i.n>0||x.i.allDay||x.i.d>now)})[0];
-      if(e)rows+='<button class="sc-ev" data-act="hub-go" data-v="agenda"><span class="k2-evd"><b>'+e.i.d.getDate()+'</b>'+esc(e.i.d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</span><span class="k2-evm"><span class="k2-evt">'+esc(EVN[e.e.id]||e.e.summary||'Événement')+'</span><span class="k2-evs">'+esc(cap(e.i.n===0?"aujourd'hui":e.i.n===1?'demain':e.i.d.toLocaleDateString('fr-FR',{weekday:'long'})))+(e.i.allDay?'':' · '+e.i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))+'</span></span></button>'}
+      if(e)rows+='<button class="sc-ev" data-act="hub-go" data-v="agenda"><span class="k2-evd"><b>'+e.i.d.getDate()+'</b>'+esc(e.i.d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</span><span class="k2-evm"><span class="k2-evt">'+esc(eventTitle(e.e,'Événement'))+'</span><span class="k2-evs">'+esc(cap(e.i.n===0?"aujourd'hui":e.i.n===1?'demain':e.i.d.toLocaleDateString('fr-FR',{weekday:'long'})))+(e.i.allDay?'':' · '+e.i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))+'</span></span></button>'}
     var evH=rows;rows='';
     if(nt){var da=departAt(nt),cd=ts.k==='now'?'<span class="k2-now">🌴 En vacances · jour '+ts.day+' sur '+ts.tot+'</span>':ts.n===0?'<span class="k2-now">🎉 C\'est aujourd\'hui !</span>':da?'<span class="flap" role="timer" data-cd="'+da.d.getTime()+'">'+flapInner(da.d-Date.now())+'</span>':'<span class="k2-now">J-'+ts.n+'</span>';
       rows+='<button class="sc-trip" data-act="hub-go" data-v="voyage"><span class="sc-tl">'+esc(tEmo(nt)+' '+nt.title)+(ts.k==='soon'&&ts.n>0?' dans':'')+'</span>'+cd+'</button>'}
@@ -506,11 +607,13 @@
     h+='<button class="viewbot" type="button" data-act="view-toggle">Passer à la vue détaillée</button>';
     el.innerHTML=h}
   /* ---- Onglet Agenda : ce qui va se passer dans les prochains jours et semaines ---- */
-  var agSel=null;
+  var agSel=null,agHidden=new Set();
   function renderAgenda(){var el=$('agtab');if(!el||TAB!=='agenda')return;
     var t0d=t0(),items=[],now=new Date();
-    if(cal.status==='ok')cal.events.forEach(function(e){if(!e||HID.indexOf(e.id)>=0)return;var i=evInfo(e);if(!i||i.n<0)return;if(i.n===0&&!i.allDay&&i.d<now&&now-i.d>3*36e5)return;
-      items.push({n:i.n,k:i.allDay?'':i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),t:EVN[e.id]||e.summary||'Sans titre',id:e.id,type:'ev'})});
+    var calendars=cal.calendars||[],focused=document.activeElement,focusId=focused&&el.contains(focused)?focused.getAttribute('data-calendar'):null;
+    var filters=calendars.map(function(c){return '<button type="button" class="ag-filter" data-act="ag-filter" data-calendar="'+esc(c.id)+'" aria-pressed="'+!agHidden.has(c.id)+'" title="'+esc(c.name)+'">'+esc(c.name)+'</button>'}).join('');
+    if(cal.status==='ok')cal.events.forEach(function(e){if(!e||HID.indexOf(e.id)>=0||(e.calendars&&e.calendars.every(function(id){return agHidden.has(id)})))return;var i=evInfo(e);if(!i||i.n<0)return;if(i.n===0&&!i.allDay&&i.d<now&&now-i.d>3*36e5)return;
+      items.push({n:i.n,k:i.allDay?'':i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),t:eventTitle(e,'Sans titre'),id:e.id,type:'ev'})});
     trips().forEach(function(t){var sp=tripSpan(t);if(!sp.s)return;var a=diff(sp.s),b=sp.e?diff(sp.e):a;
       if(a>=0&&a<=60)items.push({n:a,k:hPart(t.start),t:'Départ · '+t.title,em:tEmo(t),id:t.id,type:'trip'});
       if(b>=0&&b<=60&&b!==a)items.push({n:b,k:hPart(t.end),t:'Retour · '+t.title,em:'🏠',id:t.id,type:'trip'})});
@@ -531,8 +634,10 @@
         :'<p class="ag-none">'+(cal.status==='ok'?'Rien de prévu 🐾':cal.status==='loading'?'Chargement…':'—')+'</p>')+'</section>'}
     if(cal.status!=='ok'&&cal.status!=='loading')body='<p class="empty">L\'agenda ne répond pas pour le moment.</p>'+body;
     var nHid=cal.status==='ok'?cal.events.filter(function(e){return e&&HID.indexOf(e.id)>=0}).length:0;
-    el.innerHTML='<div class="ag-list">'+body+'</div>'+(nHid?'<button class="lnk ag-hid" data-act="ag-hid">'+nHid+' événement'+(nHid>1?'s':'')+' masqué'+(nHid>1?'s':'')+' · tout réafficher</button>':'')+
-      '<a class="ag-gc" href="https://calendar.google.com/calendar/u/0/r/week" target="_blank" rel="noopener noreferrer">Ouvrir Google Agenda ↗</a>'}
+    el.innerHTML=(filters?'<div class="ag-filters" role="group" aria-label="Agendas synchronisés">'+filters+'</div>':'')+'<div class="ag-list">'+body+'</div>'+(nHid?'<button class="lnk ag-hid" data-act="ag-hid">'+nHid+' événement'+(nHid>1?'s':'')+' masqué'+(nHid>1?'s':'')+' · tout réafficher</button>':'')+
+      '<a class="ag-gc" href="https://calendar.google.com/calendar/u/0/r/week" target="_blank" rel="noopener noreferrer">Ouvrir Google Agenda ↗</a>';
+    if(focusId!==null)Array.prototype.some.call(el.querySelectorAll('[data-calendar]'),function(button){if(button.getAttribute('data-calendar')!==focusId)return false;button.focus({preventScroll:true});return true});
+  }
   /* Petite fête quand on coche la dernière chose du jour */
   function celebrate(){[].forEach.call(document.querySelectorAll('.k2,.sc-k'),function(k){k.classList.remove('jump');void k.offsetWidth;k.classList.add('jump')});
     if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
@@ -807,7 +912,20 @@
     document.addEventListener('touchmove',function(e){var t=e.touches[0];if(t)move(t.clientX,t.clientY,e)},{passive:false});
     document.addEventListener('touchend',function(){cancelPend();finish()});
     document.addEventListener('touchcancel',function(){cancelPend();finish()});
-    document.addEventListener('mousedown',function(e){if(e.button===0)start(e,e.clientX,e.clientY)});
+    document.addEventListener('touchstart',function(e){
+    weatherTouch=e.touches.length===1&&e.target.closest&&e.target.closest('.sc-weather-window')?e.touches[0]:null;
+  },{passive:true});
+  document.addEventListener('touchcancel',function(){weatherTouch=null});
+  document.addEventListener('touchend',function(e){
+    if(!weatherTouch)return;
+    var dx=e.changedTouches[0].clientX-weatherTouch.clientX, dy=e.changedTouches[0].clientY-weatherTouch.clientY;
+    weatherTouch=null;
+    if(!W||!Object.prototype.hasOwnProperty.call(W,'auxerre')||Math.abs(dx)<45||Math.abs(dx)<=Math.abs(dy)*1.5)return;
+    var next=dx<0?1:0;
+    setWeatherSlide(next);
+  },{passive:true});
+
+  document.addEventListener('mousedown',function(e){if(e.button===0)start(e,e.clientX,e.clientY)});
     document.addEventListener('mousemove',function(e){move(e.clientX,e.clientY,e)});
     document.addEventListener('mouseup',function(){cancelPend();finish()});
     document.addEventListener('contextmenu',function(e){if(cDrag||(e.target.closest&&e.target.closest('.crow:not(.done)')&&e.target.closest('#l-courses,#cv-list')))e.preventDefault()});
@@ -1225,6 +1343,21 @@
     return true}
 
   /* À venir : événements Google Agenda (lus par le script, en lecture seule) */
+  var eventIcons=[
+    [/\bflights?\b/,'✈️'],
+    [/\bsoirees?\b/,'🎉'],
+    [/\b(?:foot|aja)\b/,'⚽'],
+    [/\bcombats?\b/,'🥊'],
+    [/\bweek(?:[\s‑–-]+)?ends?\b/,'🚗'],
+    [/\b(?:voyages?|vacances?)\b/,'☀️']
+  ];
+  function eventTitle(e,fallback){
+    var title=EVN[e.id]||e.summary||fallback;
+    if(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\u20E3]/u.test(title))return title;
+    var normalized=nrm(title);
+    var rule=eventIcons.find(function(pair){return pair[0].test(normalized)});
+    return rule?rule[1]+' '+title:title;
+  }
   function evInfo(e){
     var s=e.start||{},d,allDay=false;
     if(s.dateTime){d=new Date(s.dateTime)}else if(s.date){d=parse(s.date);allDay=true}else return null;
@@ -1244,11 +1377,11 @@
       var big=wk.map(function(x){
         var i=x.i,d=i.d,day=i.n<=0?"Aujourd'hui":i.n===1?'Demain':cap(d.toLocaleDateString('fr-FR',{weekday:'long'}));
         return '<div class="row evrow"'+(showHid?'':' role="button" tabindex="0" data-act="ev-edit" data-id="'+esc(x.e.id)+'" title="Renommer"')+'><div class="date-badge"><b>'+d.getDate()+'</b><span>'+esc(d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</span></div>'+
-          '<div class="main"><span class="t">'+esc((EVN[x.e.id]||x.e.summary||'Sans titre'))+'</span><span class="sub"><strong>'+esc(day)+'</strong> · '+esc(tfmt(i))+'</span></div>'+hideBtn(x.e.id,showHid)+'</div>';
+          '<div class="main"><span class="t">'+esc(eventTitle(x.e,'Sans titre'))+'</span><span class="sub"><strong>'+esc(day)+'</strong> · '+esc(tfmt(i))+'</span></div>'+hideBtn(x.e.id,showHid)+'</div>';
       }).join('');
       var small=later.map(function(x){
         var i=x.i;
-        return '<div class="mini-ev evrow"'+(showHid?'':' role="button" tabindex="0" data-act="ev-edit" data-id="'+esc(x.e.id)+'" title="Renommer"')+'><b>'+esc(wdn(i.d)+' '+i.d.getDate()+' '+i.d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</b><span>'+esc((EVN[x.e.id]||x.e.summary||'Sans titre'))+'</span><i>'+(i.allDay?'':esc(tfmt(i)))+'</i>'+hideBtn(x.e.id,showHid)+'</div>';
+        return '<div class="mini-ev evrow"'+(showHid?'':' role="button" tabindex="0" data-act="ev-edit" data-id="'+esc(x.e.id)+'" title="Renommer"')+'><b>'+esc(wdn(i.d)+' '+i.d.getDate()+' '+i.d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</b><span>'+esc(eventTitle(x.e,'Sans titre'))+'</span><i>'+(i.allDay?'':esc(tfmt(i)))+'</i>'+hideBtn(x.e.id,showHid)+'</div>';
       }).join('');
       el.innerHTML=(big||'<p class="empty">'+(showHid?'Aucun événement masqué.':'Rien de prévu cette semaine.')+'</p>')+(small?'<div class="sec-label">'+(calRange==='month'?'Plus tard ce mois-ci':'Semaines suivantes')+'</div>'+small:'')+((nHid||showHid)?'<button class="lnk" data-act="ev-toggle">'+(showHid?'← Retour':'Masqués ('+nHid+')')+'</button>':'');
       var cr=$('cal-r');if(cr){cr.hidden=showHid;cr.innerHTML=[['week','En cours'],['weeks','3 semaines'],['month','1 mois']].map(function(o){return '<button type="button" class="'+(calRange===o[0]?'on':'')+'" data-act="cal-range" data-v="'+o[0]+'" aria-pressed="'+(calRange===o[0])+'">'+o[1]+'</button>'}).join('')}
@@ -1304,25 +1437,21 @@
 
   /* Mémoire locale : dernières données connues, affichées si le réseau manque */
   var cacheT=null,fromCache=false;
-  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null}))}
+  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))}
   window.addEventListener('pagehide',cacheNow);document.addEventListener('visibilitychange',function(){if(document.hidden)cacheNow()});
   function cacheSave(){
     if(fromCache||!KEY)return;clearTimeout(cacheT);
-    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null}))},600);
+    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))},600);
   }
   function cacheLoad(){
     try{
       var c=JSON.parse(lsGet(CK)||'null');if(!c||!c.S)return false;
       ['projects','routines','shop','courses','voyages'].forEach(function(k){S[k]=Array.isArray(c.S[k])?c.S[k]:[];loaded[k]=true});
-      setPeople(c.P);W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
+      revisions=c.revisions||{};setPeople(c.P);W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
       overlayOutbox(); /* modifs faites hors ligne et pas encore envoyées */
-      if(Array.isArray(c.cal))cal={status:'ok',events:c.cal};
+      if(Array.isArray(c.cal))cal={status:'ok',events:c.cal,calendars:Array.isArray(c.calendars)?c.calendars:[]};
       fromCache=c.t;return true;
     }catch(e){return false}
-  }
-  function cacheNote(){
-    var b=$('banner');if(!b)return;
-    if(fromCache){var d=new Date(fromCache);b.innerHTML='<div class="note">Dernières données · '+esc(d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))+'</div>'}
   }
   function render(){var ae0=document.activeElement;if(ae0&&ae0.hasAttribute&&ae0.hasAttribute('data-stepedit'))return;renderCare();renderTodoAll();renderHub();renderQTab();renderAgenda();renderTodo();renderMain();renderShop();renderCourses();renderTrips();renderTripNext();renderVView();renderSheet(true);cacheSave()}
 
@@ -1397,6 +1526,13 @@
     else if(a==='sheet-close'){iconOpen=false;tEdit=null;tplMgr=false;tplEdit=null;bilPop=null;grpEdit=null;qCal=null;if(evEdit){evEdit=null;renderSheet();return}agOpen=false;evEdit=null;wishOpen=null;projId=null;openId=null;calFor=null;confirmDel=null;renderSheet()}
     else if(a==='care-add'){var csec2=b.closest('section'),cf=csec2&&csec2.querySelector('form.care-add');if(cf){cf.hidden=!cf.hidden;if(!cf.hidden)cf.querySelector('input').focus()}}
     else if(a==='care-chk'){careToggle(id)}
+    else if(a==='weather-day'){
+      weatherDates[weatherSlide]=id||null;
+      var slide=b.closest('.sc-weather-slide');
+      slide.innerHTML=weatherCard(weatherSlide);
+      slide.querySelector('[aria-pressed="true"]').focus({preventScroll:true});
+    }
+    else if(a==='weather-city'){setWeatherSlide(Number(id))}
     else if(a==='hub-go'){hubGo(b.getAttribute('data-v'))}
     else if(a==='view-set'){setView(b.getAttribute('data-v'))}
     else if(a==='view-toggle'){setView(VIEW==='simple'?'detail':'simple')}
@@ -1441,6 +1577,7 @@
     else if(a==='cview-close'){cview(false,true)}
     else if(a==='qview-open'){setTab('quetes')}
     else if(a==='ag-day'){var nd=Number(b.getAttribute('data-v'));agSel=nd;renderAgenda();var g=document.getElementById('ag-d'+nd);if(g)g.scrollIntoView({block:'start',behavior:'smooth'});else toastMsg('Rien de prévu ce jour-là')}
+    else if(a==='ag-filter'){var calendarId=b.getAttribute('data-calendar');if(agHidden.has(calendarId))agHidden.delete(calendarId);else agHidden.add(calendarId);renderAgenda()}
     else if(a==='ag-hid'){setHid([]);renderAgenda()}
     else if(a==='qt-done'){qtDone=!qtDone;renderQTab()}
     else if(a==='qt-cat'){qtCat=b.getAttribute('data-v');if(qtCat!=='all'&&!QCATL[qtCat])qtCat='all';try{localStorage.setItem('maison-qcat',qtCat)}catch(e){}renderQTab()}
@@ -1455,7 +1592,7 @@
     else if(a==='done-tog'){showDone=!showDone;lsSet('maison-show-done',showDone?'1':'0');renderTodo()}
     else if(a==='cal-range'){calRange=b.getAttribute('data-v');lsSet('maison-cal-range',calRange);renderCal()}
     else if(a==='ev-toggle'){showHid=!showHid;renderCal()}
-    else if(a==='logout'){if(confirm('Déconnecter cet appareil ? Le code d\'accès sera redemandé.'))logout('')}
+    else if(a==='logout'){logout()}
   });
 
   /* Les boutons + deviennent − quand leur formulaire est ouvert */
@@ -1566,17 +1703,17 @@
     else if(e.key==='Enter'&&t&&t.hasAttribute&&t.hasAttribute('data-snzn')){e.preventDefault();var gb=t.parentNode.querySelector('.snzgo');if(gb)gb.click()}
   });
   window.addEventListener('offline',syncNote);
-  window.addEventListener('online',function(){retryMs=3000;syncNote();flush();load()});
+  window.addEventListener('online',function(){retryMs=1500;syncNote();load().then(flush)});
 
   setTab(TAB);setView(VIEW);
   render();renderCal();
   if(location.hash==='#quetes'){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}setTab('quetes')}
   if(location.hash==='#courses')cview(true,false);
   if(location.hash==='#voyage'){var lv=lsGet('maison-trip');if(lv){setTab('voyage');vview(lv,false)}else{try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}}
-  if(!API||!KEY){showLogin('')}
+  if(!KEY){showLogin('')}
   else{
-    if(cacheLoad()){renderWeather();renderCal();render();cacheNote()}
-    load();flush();startPolling();
+    hideLogin();
+    if(cacheLoad()){renderWeather();renderCal();render()}
+    load().then(flush);startPolling();syncNote();
   }
-  if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}
 })();
