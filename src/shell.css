@@ -1,0 +1,15 @@
+#dashboard-root {
+  display: contents;
+}
+#banner:has(#sync-controls:empty) {
+  display: none;
+}
+#sync-controls .note + .note {
+  margin-top: 0.5rem;
+}
+#sync-controls .note p {
+  margin: 0 0 0.25rem;
+}
+#sync-controls button {
+  margin: 0.25rem;
+}

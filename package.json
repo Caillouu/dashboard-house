@@ -1,0 +1,33 @@
+{
+  "name": "dashboard-house",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "vite",
+    "check": "tsc --noEmit",
+    "build": "npm run check && vite build",
+    "preview": "vite preview",
+    "db:migrate": "node --env-file-if-exists=.env.local tools/migrate.ts",
+    "test": "node --test tools/dashboard.test.ts"
+  },
+  "dependencies": {
+    "@libsql/client": "0.17.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "typescript": "6.0.3",
+    "vite": "8.3.5"
+  },
+  "overrides": {
+    "@rolldown/pluginutils": "1.0.1",
+    "rolldown": "1.2.16"
+  }
+}
