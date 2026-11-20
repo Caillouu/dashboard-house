@@ -1258,7 +1258,11 @@ body[data-tab="maison"] .addgrp{display:flex}
 
 /* Prévisions et choix du lieu dans la carte météo de l’accueil. */
 #weather-slider{min-width:0}
-#weather-slider .scene{touch-action:pan-y pinch-zoom}
+.sc-weather-window{overflow:hidden;touch-action:pan-y pinch-zoom;padding:4px 5px 6px;margin:-4px -5px -6px}
+.sc-weather-track{display:flex;gap:10px;transition:transform .32s ease}
+.sc-weather-track[data-slide="1"]{transform:translateX(calc(-100% - 10px))}
+.sc-weather-slide{flex:0 0 100%;min-width:0}
+@media (prefers-reduced-motion:reduce){.sc-weather-track{transition:none}}
 .sc-weather-detail{position:relative;z-index:1}
 .sc-weather-date{display:block;margin-bottom:3px;font-size:12px;font-weight:800;color:var(--ink2)}
 .scene.night .sc-weather-date{color:#fff}
@@ -1267,7 +1271,7 @@ body[data-tab="maison"] .addgrp{display:flex}
 .sc-weather-days button[aria-pressed="true"]{border-color:var(--lav);background:#F3F0FF;color:var(--ink)}
 .sc-weather-days svg{width:27px;height:27px}
 .sc-weather-dots{display:flex;justify-content:center}
-.sc-weather-dots button{display:grid;place-items:center;width:32px;height:28px;padding:0;border:0;border-radius:999px;background:transparent;cursor:pointer}
+.sc-weather-dots button{display:grid;place-items:center;width:24px;height:28px;padding:0;border:0;border-radius:999px;background:transparent;cursor:pointer}
 .sc-weather-dots button::before{content:"";width:6px;height:6px;border-radius:50%;background:rgba(141,123,240,.35)}
 .sc-weather-dots button[aria-pressed="true"]::before{background:var(--lav)}
 .sc-weather-days button:focus-visible,.sc-weather-dots button:focus-visible{outline:2px solid var(--lav);outline-offset:2px}

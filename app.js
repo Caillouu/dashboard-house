@@ -478,13 +478,13 @@
     d+='<ellipse cx="290" cy="232" rx="150" ry="46" fill="'+(/night/.test(mood)?'#3B3374':mood==='snow'?'#F4F6FB':'#BFE8C9')+'"/>';
     return '<svg class="sc-svg" viewBox="0 0 360 230" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">'+d+'</svg>'}
   var weatherSlide=0, weatherDates=[null,null], weatherTouch=null;
-  function weatherCard(){
-    var weather=weatherSlide===0?W:W&&W.auxerre;
-    var days=weather&&weather.days||[], date=weatherDates[weatherSlide];
+  function weatherCard(slide){
+    var weather=slide===0?W:W&&W.auxerre;
+    var days=weather&&weather.days||[], date=weatherDates[slide];
     var forecast=days.slice(1).find(function(day){return day.date===date});
     var shown=forecast||weather, mood=sceneMood(shown, forecast), c=shown&&shown.cond;
     var hr=forecast?12:new Date().getHours(), night=/night/.test(mood);
-    var city=weatherSlide===1?'Auxerre':weather&&weather.city||'Météo locale';
+    var city=slide===1?'Auxerre':weather&&weather.city||'Météo locale';
     var t=function(n){return Number.isFinite(n)?Math.round(n)+'°':'—'};
     var dayName=function(value, long){
       return cap(new Date(value+'T12:00:00').toLocaleDateString('fr-FR',{weekday:long?'long':'short',day:'numeric',month:long?'long':undefined}));
@@ -505,20 +505,34 @@
           '<span>'+esc(label)+'</span>'+wIcon(day.cond,true)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span></button>';
       }).join('')+'</div>';
     }
-    if(W&&Object.prototype.hasOwnProperty.call(W,'auxerre')){
-      h+='<div class="sc-weather-dots" role="group" aria-label="Lieux météo">'+[W.city||'Météo locale','Auxerre'].map(function(name,i){
-        return '<button type="button" data-act="weather-city" data-id="'+i+'" aria-label="'+esc(name)+'" aria-pressed="'+(weatherSlide===i)+'"></button>';
-      }).join('')+'</div>';
-    }
     return h;
   }
-  function updateWeatherCard(){
+  function weatherSlider(){
+    var names=W&&Object.prototype.hasOwnProperty.call(W,'auxerre')?[W.city||'Météo locale','Auxerre']:[];
+    if(!names.length)weatherSlide=0;
+    var panels=(names.length?names:['']).map(function(_,i){
+      return '<div class="sc-weather-slide"'+(i===weatherSlide?'':' inert')+'>'+weatherCard(i)+'</div>';
+    }).join('');
+    var dots=names.map(function(name,i){
+      return '<button type="button" data-act="weather-city" data-id="'+i+'" aria-label="'+esc(name)+'" aria-pressed="'+(weatherSlide===i)+'"></button>';
+    }).join('');
+    return '<div id="weather-slider"><div class="sc-weather-window"><div class="sc-weather-track" data-slide="'+weatherSlide+'">'+panels+'</div></div>'+
+      (dots?'<div class="sc-weather-dots" role="group" aria-label="Lieux météo">'+dots+'</div>':'')+'</div>';
+  }
+  function setWeatherSlide(next){
     var panel=$('weather-slider');
-    if(panel)panel.innerHTML=weatherCard();
+    if(!panel||next===weatherSlide)return;
+    var track=panel.querySelector('.sc-weather-track'), dots=panel.querySelectorAll('[data-act="weather-city"]');
+    if(!dots[next])return;
+    if(track.children[weatherSlide].contains(document.activeElement))dots[next].focus({preventScroll:true});
+    weatherSlide=next;
+    track.dataset.slide=next;
+    Array.from(track.children).forEach(function(slide,i){slide.inert=i!==next});
+    dots.forEach(function(dot,i){dot.setAttribute('aria-pressed',String(i===next))});
   }
   function renderHub3(){var el=$('hub3');if(!el||TAB!=='home'||VIEW!=='simple')return;
     var due=dueList(),nt=nextTrip(),ts=nt&&tripState(nt);
-    var h='<div id="weather-slider">'+weatherCard()+'</div>';
+    var h=weatherSlider();
     /* En ce moment : prochain événement, missions maison, quête principale, voyage */
     var rows='';
     mains3().forEach(function(m){var ss=m.steps||[],dn=ss.filter(function(x){return x.done}).length,id=esc(m.id);
@@ -843,7 +857,7 @@
     document.addEventListener('touchend',function(){cancelPend();finish()});
     document.addEventListener('touchcancel',function(){cancelPend();finish()});
     document.addEventListener('touchstart',function(e){
-    weatherTouch=e.touches.length===1&&e.target.closest&&e.target.closest('#weather-slider .scene')?e.touches[0]:null;
+    weatherTouch=e.touches.length===1&&e.target.closest&&e.target.closest('.sc-weather-window')?e.touches[0]:null;
   },{passive:true});
   document.addEventListener('touchcancel',function(){weatherTouch=null});
   document.addEventListener('touchend',function(e){
@@ -852,7 +866,7 @@
     weatherTouch=null;
     if(!W||!Object.prototype.hasOwnProperty.call(W,'auxerre')||Math.abs(dx)<45||Math.abs(dx)<=Math.abs(dy)*1.5)return;
     var next=dx<0?1:0;
-    if(next!==weatherSlide){weatherSlide=next;updateWeatherCard()}
+    setWeatherSlide(next);
   },{passive:true});
 
   document.addEventListener('mousedown',function(e){if(e.button===0)start(e,e.clientX,e.clientY)});
@@ -1445,13 +1459,13 @@
     else if(a==='sheet-close'){iconOpen=false;tEdit=null;tplMgr=false;tplEdit=null;bilPop=null;grpEdit=null;qCal=null;if(evEdit){evEdit=null;renderSheet();return}agOpen=false;evEdit=null;wishOpen=null;projId=null;openId=null;calFor=null;confirmDel=null;renderSheet()}
     else if(a==='care-add'){var csec2=b.closest('section'),cf=csec2&&csec2.querySelector('form.care-add');if(cf){cf.hidden=!cf.hidden;if(!cf.hidden)cf.querySelector('input').focus()}}
     else if(a==='care-chk'){careToggle(id)}
-    else if(a==='weather-day'||a==='weather-city'){
-      if(a==='weather-day')weatherDates[weatherSlide]=id||null;
-      else weatherSlide=Number(id);
-      updateWeatherCard();
-      var selected=$('weather-slider').querySelector('[data-act="'+a+'"][aria-pressed="true"]');
-      if(selected)selected.focus({preventScroll:true});
+    else if(a==='weather-day'){
+      weatherDates[weatherSlide]=id||null;
+      var slide=b.closest('.sc-weather-slide');
+      slide.innerHTML=weatherCard(weatherSlide);
+      slide.querySelector('[aria-pressed="true"]').focus({preventScroll:true});
     }
+    else if(a==='weather-city'){setWeatherSlide(Number(id))}
     else if(a==='hub-go'){hubGo(b.getAttribute('data-v'))}
     else if(a==='view-set'){setView(b.getAttribute('data-v'))}
     else if(a==='view-toggle'){setView(VIEW==='simple'?'detail':'simple')}
