@@ -550,7 +550,7 @@
         (ss.length?'<ul class="sc-list">'+ss.map(function(x,i){return '<li class="tq-step'+(x.done?' done':'')+'"><button class="chk" data-act="ps" data-id="'+id+'" data-i="'+i+'" aria-label="'+(x.done?'Décocher : ':'Terminer : ')+esc(x.t)+'">'+CHECK+'</button><button class="tq-st" data-act="proj-open" data-id="'+id+'">'+esc(x.t)+'</button></li>'}).join('')+'</ul>':'')+'</div>'});
     var qH=rows;rows='';
     if(cal.status==='ok'){var now=new Date(),e=cal.events.filter(function(x){return x&&HID.indexOf(x.id)<0}).map(function(x){return {e:x,i:evInfo(x)}}).filter(function(x){return x.i&&x.i.n>=0&&(x.i.n>0||x.i.allDay||x.i.d>now)})[0];
-      if(e)rows+='<button class="sc-ev" data-act="hub-go" data-v="agenda"><span class="k2-evd"><b>'+e.i.d.getDate()+'</b>'+esc(e.i.d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</span><span class="k2-evm"><span class="k2-evt">'+esc(EVN[e.e.id]||e.e.summary||'Événement')+'</span><span class="k2-evs">'+esc(cap(e.i.n===0?"aujourd'hui":e.i.n===1?'demain':e.i.d.toLocaleDateString('fr-FR',{weekday:'long'})))+(e.i.allDay?'':' · '+e.i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))+'</span></span></button>'}
+      if(e)rows+='<button class="sc-ev" data-act="hub-go" data-v="agenda"><span class="k2-evd"><b>'+e.i.d.getDate()+'</b>'+esc(e.i.d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</span><span class="k2-evm"><span class="k2-evt">'+esc(eventTitle(e.e,'Événement'))+'</span><span class="k2-evs">'+esc(cap(e.i.n===0?"aujourd'hui":e.i.n===1?'demain':e.i.d.toLocaleDateString('fr-FR',{weekday:'long'})))+(e.i.allDay?'':' · '+e.i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}))+'</span></span></button>'}
     var evH=rows;rows='';
     if(nt){var da=departAt(nt),cd=ts.k==='now'?'<span class="k2-now">🌴 En vacances · jour '+ts.day+' sur '+ts.tot+'</span>':ts.n===0?'<span class="k2-now">🎉 C\'est aujourd\'hui !</span>':da?'<span class="flap" role="timer" data-cd="'+da.d.getTime()+'">'+flapInner(da.d-Date.now())+'</span>':'<span class="k2-now">J-'+ts.n+'</span>';
       rows+='<button class="sc-trip" data-act="hub-go" data-v="voyage"><span class="sc-tl">'+esc(tEmo(nt)+' '+nt.title)+(ts.k==='soon'&&ts.n>0?' dans':'')+'</span>'+cd+'</button>'}
@@ -571,7 +571,7 @@
     var calendars=cal.calendars||[],focused=document.activeElement,focusId=focused&&el.contains(focused)?focused.getAttribute('data-calendar'):null;
     var filters=calendars.map(function(c){return '<button type="button" class="ag-filter" data-act="ag-filter" data-calendar="'+esc(c.id)+'" aria-pressed="'+!agHidden.has(c.id)+'" title="'+esc(c.name)+'">'+esc(c.name)+'</button>'}).join('');
     if(cal.status==='ok')cal.events.forEach(function(e){if(!e||HID.indexOf(e.id)>=0||(e.calendars&&e.calendars.every(function(id){return agHidden.has(id)})))return;var i=evInfo(e);if(!i||i.n<0)return;if(i.n===0&&!i.allDay&&i.d<now&&now-i.d>3*36e5)return;
-      items.push({n:i.n,k:i.allDay?'':i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),t:EVN[e.id]||e.summary||'Sans titre',id:e.id,type:'ev'})});
+      items.push({n:i.n,k:i.allDay?'':i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),t:eventTitle(e,'Sans titre'),id:e.id,type:'ev'})});
     trips().forEach(function(t){var sp=tripSpan(t);if(!sp.s)return;var a=diff(sp.s),b=sp.e?diff(sp.e):a;
       if(a>=0&&a<=60)items.push({n:a,k:hPart(t.start),t:'Départ · '+t.title,em:tEmo(t),id:t.id,type:'trip'});
       if(b>=0&&b<=60&&b!==a)items.push({n:b,k:hPart(t.end),t:'Retour · '+t.title,em:'🏠',id:t.id,type:'trip'})});
@@ -1301,6 +1301,20 @@
     return true}
 
   /* À venir : événements Google Agenda (lus par le script, en lecture seule) */
+  var eventIcons=[
+    [/\bflights?\b/,'✈️'],
+    [/\bsoirees?\b/,'🎉'],
+    [/\b(?:foot|aja)\b/,'⚽'],
+    [/\bcombats?\b/,'🥊'],
+    [/\bweek(?:[\s‑–-]+)?ends?\b/,'📅']
+  ];
+  function eventTitle(e,fallback){
+    var title=EVN[e.id]||e.summary||fallback;
+    if(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\u20E3]/u.test(title))return title;
+    var normalized=nrm(title);
+    var rule=eventIcons.find(function(pair){return pair[0].test(normalized)});
+    return rule?rule[1]+' '+title:title;
+  }
   function evInfo(e){
     var s=e.start||{},d,allDay=false;
     if(s.dateTime){d=new Date(s.dateTime)}else if(s.date){d=parse(s.date);allDay=true}else return null;
@@ -1320,11 +1334,11 @@
       var big=wk.map(function(x){
         var i=x.i,d=i.d,day=i.n<=0?"Aujourd'hui":i.n===1?'Demain':cap(d.toLocaleDateString('fr-FR',{weekday:'long'}));
         return '<div class="row evrow"'+(showHid?'':' role="button" tabindex="0" data-act="ev-edit" data-id="'+esc(x.e.id)+'" title="Renommer"')+'><div class="date-badge"><b>'+d.getDate()+'</b><span>'+esc(d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</span></div>'+
-          '<div class="main"><span class="t">'+esc((EVN[x.e.id]||x.e.summary||'Sans titre'))+'</span><span class="sub"><strong>'+esc(day)+'</strong> · '+esc(tfmt(i))+'</span></div>'+hideBtn(x.e.id,showHid)+'</div>';
+          '<div class="main"><span class="t">'+esc(eventTitle(x.e,'Sans titre'))+'</span><span class="sub"><strong>'+esc(day)+'</strong> · '+esc(tfmt(i))+'</span></div>'+hideBtn(x.e.id,showHid)+'</div>';
       }).join('');
       var small=later.map(function(x){
         var i=x.i;
-        return '<div class="mini-ev evrow"'+(showHid?'':' role="button" tabindex="0" data-act="ev-edit" data-id="'+esc(x.e.id)+'" title="Renommer"')+'><b>'+esc(wdn(i.d)+' '+i.d.getDate()+' '+i.d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</b><span>'+esc((EVN[x.e.id]||x.e.summary||'Sans titre'))+'</span><i>'+(i.allDay?'':esc(tfmt(i)))+'</i>'+hideBtn(x.e.id,showHid)+'</div>';
+        return '<div class="mini-ev evrow"'+(showHid?'':' role="button" tabindex="0" data-act="ev-edit" data-id="'+esc(x.e.id)+'" title="Renommer"')+'><b>'+esc(wdn(i.d)+' '+i.d.getDate()+' '+i.d.toLocaleDateString('fr-FR',{month:'short'}).replace('.',''))+'</b><span>'+esc(eventTitle(x.e,'Sans titre'))+'</span><i>'+(i.allDay?'':esc(tfmt(i)))+'</i>'+hideBtn(x.e.id,showHid)+'</div>';
       }).join('');
       el.innerHTML=(big||'<p class="empty">'+(showHid?'Aucun événement masqué.':'Rien de prévu cette semaine.')+'</p>')+(small?'<div class="sec-label">'+(calRange==='month'?'Plus tard ce mois-ci':'Semaines suivantes')+'</div>'+small:'')+((nHid||showHid)?'<button class="lnk" data-act="ev-toggle">'+(showHid?'← Retour':'Masqués ('+nHid+')')+'</button>':'');
       var cr=$('cal-r');if(cr){cr.hidden=showHid;cr.innerHTML=[['week','En cours'],['weeks','3 semaines'],['month','1 mois']].map(function(o){return '<button type="button" class="'+(calRange===o[0]?'on':'')+'" data-act="cal-range" data-v="'+o[0]+'" aria-pressed="'+(calRange===o[0])+'">'+o[1]+'</button>'}).join('')}
