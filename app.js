@@ -8,7 +8,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
      l'en-tête frame-ancestors, donc on refuse ici (un site piège pourrait sinon faire
      cliquer sur des boutons de l'app à l'insu de la personne). */
   if(window.top!==window.self){document.documentElement.textContent='Cette application ne peut pas s\'afficher à l\'intérieur d\'un autre site.';return}
-  var S={projects:[],routines:[],shop:[],courses:[],voyages:[]};
+  var S={projects:[],routines:[],shop:[],courses:[],voyages:[],debts:[]};
   var GROUPS=['Joey','Charlie','Plantes','Maison'];
   var PRIO={high:'Urgent',med:'Pas urgent',low:'Idée'}, PW={high:3,med:2,low:1}, PEMO={high:'🔥',med:'⏳',low:'💡'};
   /* Urgence d'une quête : juste un émoji ; un appui ouvre un petit menu (🔥 Urgent, ⏳ Pas urgent, 💡 Idée) */
@@ -36,7 +36,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
 
   function lockSession(message){
     KEY=null;sessionEpoch++;lsSet(LS_KEY,null);clearTimeout(cacheT);
-    S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};QUEST_SCORES={p1:0,p2:0};
+    S={projects:[],routines:[],shop:[],courses:[],voyages:[],debts:[]};PEOPLE={p1:'',p2:''};QUEST_SCORES={p1:0,p2:0};
     cal={status:'loading',events:[]};W=null;HID=[];EVN={};if(typeof agHidden!=='undefined')agHidden.clear();sig='';fromCache=false;
     if(typeof weatherSlide!=='undefined'){weatherSlide=0;weatherDates=[null,null];weatherTouch=null;weatherMascots=[randomMascot(),randomMascot()]}
     vOpen=null;render();renderCal();renderWeather();showLogin(message);
@@ -71,7 +71,8 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     shop:{cols:['id','emoji','title','budget','who','urgency','link','note','done','_t']},
     projects:{cols:['id','emoji','title','main','steps','_t']},
     courses:{cols:['id','emoji','title','qty','rayon','done','_t']},
-    voyages:{cols:['id','trip','type','title','start','end','place','ref','link','notes','done','_t']}
+    voyages:{cols:['id','trip','type','title','start','end','place','ref','link','notes','done','_t']},
+    debts:{cols:['id','title','amount','payer','_t']}
   };
   function nrm(v){return String(v==null?'':v).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
   function nDate(v){v=String(v==null?'':v).trim();if(!v)return null;var m;
@@ -96,6 +97,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     if(k==='shop'){o.budget=o.budget?(Number(String(o.budget).replace(/[^\d.,]/g,'').replace(',','.'))||''):'';
       var w=nrm(o.who);o.who=(PEOPLE.p1&&w===nrm(PEOPLE.p1))?'p1':(PEOPLE.p2&&w===nrm(PEOPLE.p2))?'p2':'couple';o.urgency=URG[nrm(o.urgency)]||'med';o.done=yes(o.done)}
     if(k==='courses'){o.done=yes(o.done)}
+    if(k==='debts'){o.amount=Math.round((Number(String(o.amount).replace(',','.'))||0)*100)/100;o.payer=o.payer==='p2'?'p2':'p1'}
     if(k==='voyages'){o.type=vType(o.type)||(o.trip?'activite':'voyage');o.start=nDT(o.start);o.end=nDT(o.end);o.done=yes(o.done);
       if(o.price!=null&&o.price!=='')o.price=Number(String(o.price).replace(',','.'))||'';
       if(o.type==='valise')o.items=String(o.notes||'').split(/\n/).map(function(x){return x.trim()}).filter(Boolean).map(function(x){return /^#\s*/.test(x)?{h:x.replace(/^#\s*/,'')}:{t:x.replace(DONE_RE,''),done:DONE_RE.test(x)}})}
@@ -135,7 +137,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     revisions=j.revisions||{};
     var s=JSON.stringify([j.sheets,j.settings,j.people,readQueue()]);
     if(fromCache)fromCache=false;
-    loaded.projects=loaded.routines=loaded.shop=loaded.courses=loaded.voyages=true;
+    loaded.projects=loaded.routines=loaded.shop=loaded.courses=loaded.voyages=loaded.debts=true;
     V_OLD=false;
     if(s===sig)return;sig=s;
     setPeople(j.people);
@@ -967,14 +969,32 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
   }
   function unclearCart(){if(!lastClear)return;var l=lastClear;lastClear=null;hideToast();l.forEach(function(o){if(!find('courses',o.id)){S.courses.push(o);shWrite('courses',o)}});render()}
 
+  /* ---- Dettes du foyer : chaque dépense est partagée à parts égales. ---- */
+  function money(value){return Number(value||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2})}
+  function renderDebts(){
+    var list=$('debts-list'),balance=$('debts-balance'),payer=$('debt-payer');if(!list||!balance)return;
+    if(payer){payer.options[0].textContent=whoLabel('p1');payer.options[1].textContent=whoLabel('p2')}
+    var rows=S.debts.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0)});
+    list.innerHTML=rows.length?rows.map(function(d){return '<article class="debt-row"><div><h3>'+esc(d.title)+'</h3><p>Payé par '+esc(whoLabel(d.payer))+'</p></div><strong>'+esc(money(d.amount))+'</strong><button type="button" class="debt-del" data-act="debt-del" data-id="'+esc(d.id)+'" aria-label="Supprimer la dette '+esc(d.title)+'">×</button></article>'}).join('')
+      :'<div class="debts-empty"><span aria-hidden="true">✓</span><h3>Les comptes sont à zéro</h3><p>Ajoute une dépense avancée pour le foyer.</p></div>';
+    var paid1=S.debts.reduce(function(total,d){return total+(d.payer==='p1'?Number(d.amount)||0:-(Number(d.amount)||0))},0),owed=Math.round(Math.abs(paid1)*50)/100;
+    if(owed<0.01)balance.innerHTML='<span>Solde</span><strong>Personne ne doit rien 🎉</strong>';
+    else{var creditor=paid1>0?'p1':'p2',debtor=creditor==='p1'?'p2':'p1';balance.innerHTML='<span>Solde total</span><strong>'+esc(whoLabel(debtor))+' doit '+esc(money(owed))+' à '+esc(whoLabel(creditor))+'</strong>'}
+    var clear=document.querySelector('.debts-clear');if(clear)clear.hidden=!rows.length;
+  }
+  function clearDebts(){
+    if(!S.debts.length||!confirm('Effacer toutes les dettes et repartir de zéro ?'))return;
+    S.debts.slice().forEach(function(d){delDoc('debts',d.id)});toastMsg('Toutes les dettes ont été effacées');
+  }
+
   /* ---- Onglets (Accueil / Maison / Courses) ---- */
-  var TAB=lsGet('maison-tab')||'home';if(TAB==='test')TAB='home';if(['home','maison','courses','voyage','quetes','agenda'].indexOf(TAB)<0)TAB='home';
+  var TAB=lsGet('maison-tab')||'home';if(TAB==='test')TAB='home';if(['home','maison','courses','voyage','quetes','agenda','dettes'].indexOf(TAB)<0)TAB='home';
   function randomizeMascotImages(){[].forEach.call(document.querySelectorAll('img[data-random-mascot]'),function(img){
     var next=randomMascot(img.getAttribute('data-mascot'));img.src=next.image;img.setAttribute('data-mascot',next.name);if(img.alt&&img.alt!=='Maison')img.alt=next.alt})}
   function setTab(t){TAB=t;lsSet('maison-tab',t);document.body.setAttribute('data-tab',t);
     var PT={maison:'Routines',courses:'Courses',voyage:'Voyages',agenda:'Agenda'},ph=$('pt-h');if(ph)ph.textContent=PT[t]||'';var pa=$('pt-act');if(pa)pa.hidden=t!=='voyage';
     [].forEach.call(document.querySelectorAll('.tabbar button'),function(b){var on=b.getAttribute('data-tab')===t;b.classList.toggle('on',on);b.setAttribute('aria-current',on?'page':'false')});
-    randomizeMascotImages();window.scrollTo(0,0);fitTodo();if(t==='home')renderHub();if(t==='quetes')renderQTab();if(t==='agenda')renderAgenda();if((t==='courses'||t==='voyage')&&Date.now()-lastLoad>15000)load()}
+    randomizeMascotImages();window.scrollTo(0,0);fitTodo();if(t==='home')renderHub();if(t==='quetes')renderQTab();if(t==='agenda')renderAgenda();if(t==='dettes')renderDebts();if((t==='courses'||t==='voyage'||t==='dettes')&&Date.now()-lastLoad>15000)load()}
   function whoLabel(k){return k==='couple'?'Couple':(PEOPLE[k]||(k==='p1'?'Personne 1':k==='p2'?'Personne 2':''))}
   var UW={high:3,med:2,low:1};
   function fitTotal(){var te=$('w-total');if(!te)return;te.style.visibility='';requestAnimationFrame(function(){if(te.scrollWidth>te.clientWidth+1)te.style.visibility='hidden'})}
@@ -1464,14 +1484,14 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
   function cacheLoad(){
     try{
       var c=JSON.parse(lsGet(CK)||'null');if(!c||!c.S)return false;
-      ['projects','routines','shop','courses','voyages'].forEach(function(k){S[k]=Array.isArray(c.S[k])?c.S[k]:[];loaded[k]=true});
+      ['projects','routines','shop','courses','voyages','debts'].forEach(function(k){S[k]=Array.isArray(c.S[k])?c.S[k]:[];loaded[k]=true});
       revisions=c.revisions||{};setPeople(c.P);QUEST_SCORES={p1:Number(c.QS&&c.QS.p1)||0,p2:Number(c.QS&&c.QS.p2)||0};W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
       overlayOutbox(); /* modifs faites hors ligne et pas encore envoyées */
       if(Array.isArray(c.cal))cal={status:'ok',events:c.cal,calendars:Array.isArray(c.calendars)?c.calendars:[]};
       fromCache=c.t;return true;
     }catch(e){return false}
   }
-  function render(){var ae0=document.activeElement;if(ae0&&ae0.hasAttribute&&ae0.hasAttribute('data-stepedit'))return;renderCare();renderTodoAll();renderHub();renderQTab();renderAgenda();renderTodo();renderMain();renderShop();renderCourses();renderTrips();renderTripNext();renderVView();renderSheet(true);cacheSave()}
+  function render(){var ae0=document.activeElement;if(ae0&&ae0.hasAttribute&&ae0.hasAttribute('data-stepedit'))return;renderCare();renderTodoAll();renderHub();renderQTab();renderAgenda();renderTodo();renderMain();renderShop();renderCourses();renderDebts();renderTrips();renderTripNext();renderVView();renderSheet(true);cacheSave()}
 
   function clock(){var n=new Date();$('hello').textContent=n.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});$('today').textContent=n.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}
   clock();setInterval(clock,15000);
@@ -1594,6 +1614,8 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     else if(a==='c-del'){delUndo('courses',id,'Article supprimé')}
     else if(a==='c-clear'){clearCart()}
     else if(a==='c-unclear'){unclearCart()}
+    else if(a==='debt-del'){delUndo('debts',id,'Dette supprimée')}
+    else if(a==='debts-clear'){clearDebts()}
     else if(a==='cview-open'){cview(true,true)}
     else if(a==='cview-close'){cview(false,true)}
     else if(a==='qview-open'){setTab('quetes')}
@@ -1647,6 +1669,12 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
       var ks=S.courses.filter(function(c){return !c.done&&c!==dup&&cExc(c)===xc}).map(cKey),top=ks.length?Math.min.apply(null,ks)-1000:null;
       if(dup){var dch={done:false,qty:pc.qty||dup.qty};if(top!==null)dch.ord=top;upd('courses',dup.id,dch)}else{if(top!==null)pc.ord=top;addDoc('courses',pc)}
       ci2.value='';ci2.focus();return;
+    }
+    if(f.id==='f-debt'){
+      var debtTitle=$('debt-title'),debtAmount=$('debt-amount'),amount=Math.round(Number(debtAmount.value)*100)/100;
+      if(!debtTitle.value.trim()||!(amount>0))return;
+      addDoc('debts',{title:debtTitle.value.trim().slice(0,80),amount:amount,payer:$('debt-payer').value==='p2'?'p2':'p1'});
+      debtTitle.value='';debtAmount.value='';debtTitle.focus();return;
     }
     if(f.getAttribute('data-form')==='tplitem'){var ti2=f.querySelector('input'),tv2=ti2.value.trim().slice(0,80);if(!tv2||!tplEdit)return;
       tplEdit.items.push(tv2);renderSheet();var ti3=document.querySelector('.sheet-card [data-tplinput]');if(ti3)ti3.focus();return}

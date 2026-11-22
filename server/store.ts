@@ -29,7 +29,7 @@ function projectDone(value: unknown, metadata: Record<string, unknown>) {
 export async function snapshot(db: Client, env: NodeJS.ProcessEnv, member: Member): Promise<Snapshot> {
   const { rows } = await db.execute('SELECT collection, id, data, revision FROM records')
   const data: Snapshot = {
-    sheets: { projects: [], routines: [], shop: [], courses: [], voyages: [] },
+    sheets: { projects: [], routines: [], shop: [], courses: [], voyages: [], debts: [] },
     settings: {},
     revisions: {},
     people: { p1: env.PERSON_1?.slice(0, 30) || 'Membre 1', p2: env.PERSON_2?.slice(0, 30) || 'Membre 2' },

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-export const widths = { routines: 8, shop: 10, projects: 6, courses: 7, voyages: 12 } as const
-export const collections = z.enum(['routines', 'shop', 'projects', 'courses', 'voyages'])
+export const widths = { routines: 8, shop: 10, projects: 6, courses: 7, voyages: 12, debts: 5 } as const
+export const collections = z.enum(['routines', 'shop', 'projects', 'courses', 'voyages', 'debts'])
 export type Collection = z.infer<typeof collections>
 export type Member = 'p1' | 'p2'
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/)

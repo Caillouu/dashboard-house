@@ -42,6 +42,7 @@ test('sessions, household state, repeated requests, and stale offline edits', as
     assert.equal(login1.headers.get('cache-control'), 'private, no-store')
     const empty = await (await call({ a: 'load' }, cookie1)).json()
     assert.deepEqual(empty.sheets.courses, [])
+    assert.deepEqual(empty.sheets.debts, [])
 
     const first = {
       a: 'put', t: 'courses', id: 'item', revision: 0, operationId: randomUUID(),
@@ -55,6 +56,14 @@ test('sessions, household state, repeated requests, and stale offline edits', as
     assert.equal(shared.member, 'p2')
     assert.deepEqual(shared.sheets.courses, [first.row])
     assert.equal(shared.revisions['courses:item'], 1)
+
+    const debt = {
+      a: 'put', t: 'debts', id: 'groceries', revision: 0, operationId: randomUUID(),
+      row: ['groceries', 'Courses du dimanche', 42.5, 'p1', '{}'],
+    }
+    assert.deepEqual(await (await call(debt, cookie1)).json(), { ok: true, revision: 1 })
+    const sharedDebt = await (await call({ a: 'load' }, cookie2)).json()
+    assert.deepEqual(sharedDebt.sheets.debts, [debt.row])
 
     const privateQuest = {
       a: 'put', t: 'projects', id: 'secret', revision: 0, operationId: randomUUID(),
