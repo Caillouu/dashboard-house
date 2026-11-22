@@ -36,14 +36,14 @@ export async function dashboard(req: Request, getDb: () => Client, env: NodeJS.P
     const member = user(req, env)
     if (!member) return reply({ ok: false, error: 'auth' }, 401)
     switch (op.a) {
-      case 'load': return reply({ ok: true, member, ...await snapshot(getDb(), env) })
+      case 'load': return reply({ ok: true, member, ...await snapshot(getDb(), env, member) })
       case 'agenda': return reply({ ok: true, ...await agenda(env) })
       case 'weather': return reply({ ok: true, weather: await weather(env) })
       case 'put':
       case 'del':
       case 'setting': {
-        const result = await applyMutation(getDb(), op)
-        return reply(result, result.ok ? 200 : 409)
+        const result = await applyMutation(getDb(), op, member)
+        return reply(result, result.ok ? 200 : result.error === 'forbidden' ? 403 : 409)
       }
     }
   } catch (error) {

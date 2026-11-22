@@ -40,7 +40,8 @@ export function DashboardShell() {
   <div id="hub3" className="hub3" aria-label="Accueil"></div>
   <section id="qtab" className="qtab" aria-label="Quêtes">
     <div className="qt-head"><h2>Quêtes</h2><button className="mini" type="button" data-act="qadd3-toggle" aria-label="Nouvelle quête">+ Nouvelle</button></div>
-    <form id="f-qadd3" className="addform" hidden><input className="in" id="q-title3" required maxLength={80} placeholder="Une idée ?" aria-label="Nouvelle quête" /><button className="btn" type="submit">Ajouter</button></form>
+    <div id="q-score" className="qscore" aria-live="polite"></div>
+    <form id="f-qadd3" className="addform qadd" hidden><input className="in" id="q-title3" required maxLength={80} placeholder="Une idée ?" aria-label="Nouvelle quête" /><label className="qghost"><input id="q-private" type="checkbox" /> <span>👻 Seulement moi</span></label><button className="btn" type="submit">Ajouter</button></form>
     <div id="qt-list" className="qt-list"></div>
   </section>
 </div>

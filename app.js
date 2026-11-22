@@ -36,7 +36,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
 
   function lockSession(message){
     KEY=null;sessionEpoch++;lsSet(LS_KEY,null);clearTimeout(cacheT);
-    S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};
+    S={projects:[],routines:[],shop:[],courses:[],voyages:[]};PEOPLE={p1:'',p2:''};QUEST_SCORES={p1:0,p2:0};
     cal={status:'loading',events:[]};W=null;HID=[];EVN={};if(typeof agHidden!=='undefined')agHidden.clear();sig='';fromCache=false;
     if(typeof weatherSlide!=='undefined'){weatherSlide=0;weatherDates=[null,null];weatherTouch=null;weatherMascots=[randomMascot(),randomMascot()]}
     vOpen=null;render();renderCal();renderWeather();showLogin(message);
@@ -83,7 +83,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
   var URG={'un jour':'low',low:'low',bientot:'med',med:'med',vite:'high',high:'high',urgent:'high'};
   var URGL={low:'Un jour',med:'Bientôt',high:'Vite'};
   var DONE_RE=/^(✓|✔|✅|\[x\]|x\s)\s*/i;
-  var PEOPLE={p1:'',p2:''}; /* prénoms : réglés dans le script Google, jamais dans le code */
+  var PEOPLE={p1:'',p2:''},QUEST_SCORES={p1:0,p2:0}; /* prénoms : réglés dans le script Google, jamais dans le code */
   function setPeople(pp){pp=pp||{};PEOPLE={p1:String(pp.p1||'').slice(0,30),p2:String(pp.p2||'').slice(0,30)}}
   function fromRow(k,r,i){var c=SHT[k].cols,o={},t={};
     try{t=JSON.parse(r[c.indexOf('_t')]||'{}')||{}}catch(e){t={}}
@@ -139,6 +139,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     V_OLD=false;
     if(s===sig)return;sig=s;
     setPeople(j.people);
+    QUEST_SCORES={p1:Number(j.questScores&&j.questScores.p1)||0,p2:Number(j.questScores&&j.questScores.p2)||0};
     Object.keys(SHT).forEach(function(k){
       S[k]=j.sheets[k].map(function(r,i){return fromRow(k,r,i)}).filter(function(row){return row.id&&row.title});
     });
@@ -200,7 +201,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
         writes++;visiblePending.delete(op.operationId);
         removeOperation(op);retryMs=1500;cacheNow();
       }catch(e){
-        if(e instanceof APIError&&[400,409,413].includes(e.status)){
+        if(e instanceof APIError&&[400,403,409,413].includes(e.status)){
           var key=target(op);
           readQueue().filter(function(item){return target(item)===key&&!item.rejected}).forEach(function(item){
             saveOperation(Object.assign({},item,{rejected:e.code==='conflict'?'conflict':'invalid'}));
@@ -702,6 +703,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
   function newId(){var a=new Uint8Array(6);crypto.getRandomValues(a);return 'g'+Date.now().toString(36)+Array.from(a,function(b){return (b%36).toString(36)}).join('')}
   function addDoc(key,data){
     data.createdAt=Date.now();var nid=newId();data.id=nid;
+    if(key==='projects'){data.createdBy=KEY;data.visibility=data.visibility==='private'?'private':'household'}
     S[key].push(data);render();shWrite(key,data);return nid;
   }
   function newCare(grp,sp){var nr={title:sp.title||sp.emoji,emoji:sp.title?(sp.emoji||autoEmoji(sp.title)):'',autoIcon:!sp.emoji,group:grp,lastDone:null};
@@ -752,6 +754,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
                    :'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="4" height="14" rx="1.4"/><rect x="13" y="5" width="4" height="14" rx="1.4"/></svg>')+
           '<span>'+(o.paused?'En pause':'En cours')+'</span></button></header>'+
       iconField(o.emoji,'data-field="pname"',o.title,'Titre de la quête','data-act="ppick" data-id="'+id+'"',QEMO,o.emoji)+
+      ((o.createdBy===KEY||!o.createdBy)?'<section class="qp-box qp-visibility"><div><b>'+(o.visibility==='private'?'👻 Quête fantôme':'🏠 Quête partagée')+'</b><span>'+(o.visibility==='private'?'Visible seulement par '+esc(PEOPLE[KEY]||'toi'):'Visible par '+esc(PEOPLE.p1||'Pierre')+' et '+esc(PEOPLE.p2||'Justine'))+'</span></div><button type="button" class="sw" role="switch" aria-checked="'+(o.visibility==='private')+'" aria-label="Quête fantôme" data-act="qprivate" data-id="'+id+'"></button></section>':'')+
       '<section class="qp-box"><div class="lab">Mini-quêtes'+(ss.length?' · '+done+'/'+ss.length:'')+'</div>'+
         (ss.length?'<div class="bar"><i style="width:'+pc+'%"></i></div>':'')+
         (ss.length?'<ul class="steps">'+ss.map(function(x,i){return '<li class="step'+(x.done?' done':'')+'"><button class="chk" data-act="ps" data-id="'+id+'" data-i="'+i+'" aria-label="Mini-quête : '+esc(x.t)+'">'+CHECK+'</button><button type="button" class="st-t" data-act="step-ren" data-id="'+id+'" data-i="'+i+'" title="Toucher pour renommer">'+esc(x.t)+'</button><button class="sx" data-act="sd" data-id="'+id+'" data-i="'+i+'" aria-label="Supprimer : '+esc(x.t)+'" title="Supprimer">×</button></li>'}).join('')+'</ul>':'')+
@@ -776,7 +779,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
   function qHead(o,fin,chk){
     var id=esc(o.id);
     return (qPaused(o)&&!fin?'<div class="qc-main qc-zz">💤 En pause</div>':o.main?'<div class="qc-main">📌 Quête principale</div>':'')+
-      '<div class="qc-h"><span class="em" aria-hidden="true">'+esc(o.emoji||'✨')+'</span><button class="qc-t" data-act="proj-open" data-id="'+id+'">'+esc(o.title)+'</button>'+prioBtn(o)+(chk?'<button class="chk qc-chk'+(fin?' on':'')+'" data-act="pset" data-id="'+id+'" data-f="status" data-v="'+(fin?'todo':'done')+'" aria-label="'+(fin?'Rouvrir : ':'Terminer : ')+esc(o.title)+'">'+CHECK+'</button>':'')+'</div>'+
+      '<div class="qc-h"><span class="em" aria-hidden="true">'+esc(o.emoji||'✨')+'</span><button class="qc-t" data-act="proj-open" data-id="'+id+'">'+esc(o.title)+'</button>'+(o.visibility==='private'?'<span class="qghost-mark" title="Visible seulement par toi" aria-label="Quête fantôme">👻</span>':'')+prioBtn(o)+(chk?'<button class="chk qc-chk'+(fin?' on':'')+'" data-act="pset" data-id="'+id+'" data-f="status" data-v="'+(fin?'todo':'done')+'" aria-label="'+(fin?'Rouvrir : ':'Terminer : ')+esc(o.title)+'">'+CHECK+'</button>':'')+'</div>'+
       (qPeriod(o)?'<div class="qc-when">'+qPeriod(o)+'</div>':'');
   }
   function qMini(o){
@@ -814,7 +817,10 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
   var qtCat='all';try{qtCat=localStorage.getItem('maison-qcat')||'all'}catch(e){}if(qtCat!=='all'&&!QCATL[qtCat])qtCat='all';
   /* Onglet Quêtes : la quête principale mise en avant (avec Kimchi), puis les quêtes secondaires */
   var qtDone=false;
+  function renderQuestScore(){var el=$('q-score');if(!el)return;var a=QUEST_SCORES.p1||0,b=QUEST_SCORES.p2||0,total=a+b,pct=total?Math.round(a/total*100):50;
+    el.innerHTML='<div class="qscore-labels"><span><i class="blue"></i>'+esc(PEOPLE.p1||'Pierre')+' <b>'+a+'</b></span><span><b>'+b+'</b> '+esc(PEOPLE.p2||'Justine')+'<i class="pink"></i></span></div><div class="qscore-bar" role="img" aria-label="Quêtes partagées terminées : '+esc(PEOPLE.p1||'Pierre')+' '+a+', '+esc(PEOPLE.p2||'Justine')+' '+b+'"><i class="blue" style="width:'+pct+'%"></i><i class="pink" style="width:'+(100-pct)+'%"></i></div>'}
   function renderQTab(){var L=$('qt-list');if(!L||TAB!=='quetes')return;
+    renderQuestScore();
     var ae=document.activeElement;if(ae&&$('qtab').contains(ae)&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&ae.value)return;
     if(ae&&ae.matches&&ae.matches('#qtab select.pr'))return;
     var isFin=function(o){var ss=o.steps||[];return o.status==='done'||qExpired(o)||(ss.length&&ss.every(function(x){return x.done}))};
@@ -1446,17 +1452,17 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
 
   /* Mémoire locale : dernières données connues, affichées si le réseau manque */
   var cacheT=null,fromCache=false;
-  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))}
+  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,QS:QUEST_SCORES,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))}
   window.addEventListener('pagehide',cacheNow);document.addEventListener('visibilitychange',function(){if(document.hidden)cacheNow()});
   function cacheSave(){
     if(fromCache||!KEY)return;clearTimeout(cacheT);
-    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))},600);
+    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,QS:QUEST_SCORES,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))},600);
   }
   function cacheLoad(){
     try{
       var c=JSON.parse(lsGet(CK)||'null');if(!c||!c.S)return false;
       ['projects','routines','shop','courses','voyages'].forEach(function(k){S[k]=Array.isArray(c.S[k])?c.S[k]:[];loaded[k]=true});
-      revisions=c.revisions||{};setPeople(c.P);W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
+      revisions=c.revisions||{};setPeople(c.P);QUEST_SCORES={p1:Number(c.QS&&c.QS.p1)||0,p2:Number(c.QS&&c.QS.p2)||0};W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
       overlayOutbox(); /* modifs faites hors ligne et pas encore envoyées */
       if(Array.isArray(c.cal))cal={status:'ok',events:c.cal,calendars:Array.isArray(c.calendars)?c.calendars:[]};
       fromCache=c.t;return true;
@@ -1505,6 +1511,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
       else if(S.projects.filter(function(q){return q.main&&q.status!=='done'&&!qIdle(q)}).length>=3){toastMsg('Déjà 3 quêtes principales 📌 — retire-en une pour en épingler une autre');return}
       else upd('projects',id,{main:true});renderSheet()}}
     else if(a==='ppause'){it=find('projects',id);if(it){upd('projects',id,{paused:it.paused?null:true});renderSheet()}}
+    else if(a==='qprivate'){it=find('projects',id);if(it&&(it.createdBy===KEY||!it.createdBy)){upd('projects',id,{visibility:it.visibility==='private'?'household':'private'});renderSheet()}}
     else if(a==='main-finish'){updUndo('projects',id,{main:false,status:'done'},'Quête accomplie 🎉')}
     else if(a==='ppick'){iconOpen=false;upd('projects',id,{emoji:b.getAttribute('data-e'),autoIcon:false});renderSheet()}
     else if(a==='icon-toggle'){iconOpen=!iconOpen;renderSheet()}
@@ -1645,7 +1652,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
       pi.value='';setPack(pt.id,cur.concat([{t:pv,done:false}]));
       var pi2=document.querySelector('#vv-body [data-packinput]');if(pi2)pi2.focus();return;
     }
-    if(f.id==='f-qadd3'){var q3t=$('q-title3'),q3s=splitEmoji(q3t.value);if(!q3s.title&&!q3s.emoji)return;var np=newProj(q3s);if(QCATL[qtCat])np.cat=qtCat;addDoc('projects',np);q3t.value='';f.hidden=true;return}
+    if(f.id==='f-qadd3'){var q3t=$('q-title3'),q3s=splitEmoji(q3t.value);if(!q3s.title&&!q3s.emoji)return;var np=newProj(q3s),qpriv=$('q-private');if(QCATL[qtCat])np.cat=qtCat;if(qpriv&&qpriv.checked)np.visibility='private';addDoc('projects',np);q3t.value='';if(qpriv)qpriv.checked=false;f.hidden=true;return}
     if(f.id==='f-add'){
       var ti=$('a-title'),sp0=splitEmoji(ti.value);if(!sp0.title&&!sp0.emoji)return;
       addDoc('projects',newProj(sp0));

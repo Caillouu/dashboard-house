@@ -56,6 +56,43 @@ test('sessions, household state, repeated requests, and stale offline edits', as
     assert.deepEqual(shared.sheets.courses, [first.row])
     assert.equal(shared.revisions['courses:item'], 1)
 
+    const privateQuest = {
+      a: 'put', t: 'projects', id: 'secret', revision: 0, operationId: randomUUID(),
+      row: ['secret', '👻', 'Surprise', '', '', JSON.stringify({ visibility: 'private', createdBy: 'p2' })],
+    }
+    assert.deepEqual(await (await call(privateQuest, cookie1)).json(), { ok: true, revision: 1 })
+    const p1Quests = await (await call({ a: 'load' }, cookie1)).json()
+    assert.equal(p1Quests.sheets.projects.length, 1)
+    assert.deepEqual(JSON.parse(p1Quests.sheets.projects[0][5]), {
+      visibility: 'private', createdBy: 'p1',
+    })
+    const p2Quests = await (await call({ a: 'load' }, cookie2)).json()
+    assert.deepEqual(p2Quests.sheets.projects, [])
+    assert.equal(p2Quests.revisions['projects:secret'], undefined)
+    assert.equal((await call({ ...privateQuest, revision: 1, operationId: randomUUID() }, cookie2)).status, 403)
+
+    const sharedQuest = {
+      a: 'put', t: 'projects', id: 'shared', revision: 0, operationId: randomUUID(),
+      row: ['shared', '✨', 'Quête commune', '', '', '{}'],
+    }
+    assert.deepEqual(await (await call(sharedQuest, cookie1)).json(), { ok: true, revision: 1 })
+    const stolenVisibility = {
+      ...sharedQuest, revision: 1, operationId: randomUUID(),
+      row: ['shared', '✨', 'Quête commune', '', '', JSON.stringify({ visibility: 'private' })],
+    }
+    assert.equal((await call(stolenVisibility, cookie2)).status, 403)
+    const completedQuest = {
+      ...sharedQuest, revision: 1, operationId: randomUUID(),
+      row: ['shared', '✨', 'Quête commune', '', '', JSON.stringify({ status: 'done' })],
+    }
+    assert.deepEqual(await (await call(completedQuest, cookie2)).json(), { ok: true, revision: 2 })
+    assert.deepEqual(await (await call(completedQuest, cookie2)).json(), { ok: true, revision: 2 })
+    const scored = await (await call({ a: 'load' }, cookie1)).json()
+    assert.deepEqual(scored.questScores, { p1: 0, p2: 1 })
+    assert.deepEqual(JSON.parse(scored.sheets.projects.find((row: string[]) => row[0] === 'shared')[5]), {
+      status: 'done', createdBy: 'p1', visibility: 'household', completedBy: 'p2',
+    })
+
     const newer = {
       ...first, revision: 1, operationId: randomUUID(),
       row: ['item', '🥛', 'Lait', '2', '', 'oui', '{}'],
