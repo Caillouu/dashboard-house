@@ -46,15 +46,16 @@ export function DashboardShell() {
   </section>
   <section id="debts-tab" className="debts-tab" aria-labelledby="debts-title">
     <header className="debts-head">
-      <div><h2 id="debts-title">Dettes</h2><p>Les dépenses avancées pour le foyer.</p></div>
-      <button className="lnk del debts-clear" type="button" data-act="debts-clear">Tout effacer</button>
+      <div><h2 id="debts-title">Dettes</h2><p>Gardez simplement le compte des dépenses avancées.</p></div>
     </header>
     <form id="f-debt" className="debt-form" autoComplete="off">
+      <div className="debt-form-head"><span className="ic peach" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M14.5 9.5c-.6-.5-1.4-.8-2.3-.8-1.5 0-2.7.9-2.7 2.1s1.1 1.7 2.5 2 2.4.8 2.4 2-1.2 2.2-2.8 2.2c-1 0-1.9-.3-2.5-.9M12 6.8v1.7M12 17.2v-1.6"/></svg></span><div><h3>Nouvelle dépense</h3><p>Elle sera partagée à parts égales.</p></div></div>
       <label>Pourquoi ?<input className="in" id="debt-title" required maxLength={80} placeholder="Ex. Courses du dimanche" /></label>
       <label>Montant<input className="in" id="debt-amount" name="amount" type="number" required min="0.01" max="999999.99" step="0.01" inputMode="decimal" placeholder="0,00" /></label>
       <label>Qui a payé ?<select className="in" id="debt-payer" name="payer"><option value="p1">Personne 1</option><option value="p2">Personne 2</option></select></label>
-      <button className="btn" type="submit">Ajouter</button>
+      <button className="mini debt-submit" type="submit"><span aria-hidden="true">+</span> Ajouter</button>
     </form>
+    <div id="debts-list-head" className="debts-list-head"><h3>Dépenses en cours</h3><button className="mini debts-clear" type="button" data-act="debts-clear">Tout effacer</button></div>
     <div id="debts-list" className="debts-list" aria-live="polite"></div>
     <div id="debts-balance" className="debts-balance" aria-live="polite"></div>
   </section>

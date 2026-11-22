@@ -975,13 +975,13 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     var list=$('debts-list'),balance=$('debts-balance'),payer=$('debt-payer');if(!list||!balance)return;
     if(payer){payer.options[0].textContent=whoLabel('p1');payer.options[1].textContent=whoLabel('p2')}
     var rows=S.debts.slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0)});
-    list.innerHTML=rows.length?rows.map(function(d){return '<article class="debt-row"><div><h3>'+esc(d.title)+'</h3><p>Payé par '+esc(whoLabel(d.payer))+'</p></div><strong>'+esc(money(d.amount))+'</strong><button type="button" class="debt-del" data-act="debt-del" data-id="'+esc(d.id)+'" aria-label="Supprimer la dette '+esc(d.title)+'">×</button></article>'}).join('')
+    list.innerHTML=rows.length?rows.map(function(d){return '<article class="debt-row '+esc(d.payer)+'"><span class="debt-person" aria-hidden="true">'+esc(whoLabel(d.payer).charAt(0))+'</span><div><h3>'+esc(d.title)+'</h3><p>Payé par '+esc(whoLabel(d.payer))+'</p></div><strong>'+esc(money(d.amount))+'</strong><button type="button" class="debt-del" data-act="debt-del" data-id="'+esc(d.id)+'" aria-label="Supprimer la dette '+esc(d.title)+'">×</button></article>'}).join('')
       :'<div class="debts-empty"><span aria-hidden="true">✓</span><h3>Les comptes sont à zéro</h3><p>Ajoute une dépense avancée pour le foyer.</p></div>';
     var paid1=S.debts.reduce(function(total,d){return total+(d.payer==='p1'?Number(d.amount)||0:-(Number(d.amount)||0))},0),owed=Math.round(Math.abs(paid1)*50)/100;
     balance.hidden=!rows.length;
     if(rows.length&&owed<0.01)balance.innerHTML='<span>Solde total</span><strong>Les dépenses s’équilibrent 🎉</strong>';
     else if(rows.length){var creditor=paid1>0?'p1':'p2',debtor=creditor==='p1'?'p2':'p1';balance.innerHTML='<span>Solde total</span><strong>'+esc(whoLabel(debtor))+' doit '+esc(money(owed))+' à '+esc(whoLabel(creditor))+'</strong>'}
-    var clear=document.querySelector('.debts-clear');if(clear)clear.hidden=!rows.length;
+    var clear=document.querySelector('.debts-clear'),listHead=$('debts-list-head');if(clear)clear.hidden=!rows.length;if(listHead)listHead.hidden=!rows.length;
   }
   function openDebtClear(){
     var dialog=$('debts-clear-dialog');if(!dialog||!S.debts.length)return;
