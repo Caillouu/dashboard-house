@@ -1359,8 +1359,8 @@ body[data-tab="dettes"] .debts-tab{display:flex;flex-direction:column;gap:14px;w
 .confirm-dialog-icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .confirm-dialog h2{font-size:19px;line-height:1.2}
 .confirm-dialog p{margin:3px 0 0;color:var(--ink2);font-size:13px;font-weight:700}
-.confirm-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:12px;border-top:1.5px solid rgba(141,123,240,.10)}
-.confirm-dialog-actions .mini{min-height:34px;padding:7px 14px;border-radius:999px;font-size:13px;font-weight:900}
+.confirm-dialog-actions{display:flex;gap:8px;width:100%;margin-top:18px;padding-top:12px;border-top:1.5px solid rgba(141,123,240,.10)}
+.confirm-dialog-actions .mini{flex:1 1 0;min-width:0;min-height:34px;padding:7px 14px;border-radius:999px;font-size:13px;font-weight:900}
 .confirm-cancel{border:0;background:var(--lav-soft);color:var(--lav)}
 .confirm-delete{border:0;background:var(--peach-soft);color:#A5432B}
 .confirm-delete:hover,.confirm-delete:focus-visible{background:#FFD9C8}
