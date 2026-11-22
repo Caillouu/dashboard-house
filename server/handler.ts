@@ -1,8 +1,8 @@
 import type { Client } from '@libsql/client'
 import { request } from '../shared/protocol.ts'
-import { clearSession, login, user } from './auth.ts'
+import { charlieSkillAuthorized, clearSession, login, user } from './auth.ts'
 import { agenda, weather } from './integrations.ts'
-import { applyMutation, snapshot } from './store.ts'
+import { addCharlieRecommendations, applyMutation, snapshot } from './store.ts'
 
 function reply(value: unknown, status = 200, cookie?: string) {
   const headers = new Headers({ 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' })
@@ -23,6 +23,10 @@ export async function dashboard(req: Request, getDb: () => Client, env: NodeJS.P
     const input = request.safeParse(JSON.parse(body))
     if (!input.success) return reply({ ok: false, error: 'invalid' }, 400)
     const op = input.data
+    if (op.a === 'charlieRecommendations') {
+      if (!charlieSkillAuthorized(req, env)) return reply({ ok: false, error: 'auth' }, 401)
+      return reply({ ok: true, ...await addCharlieRecommendations(getDb(), op.appointments) })
+    }
     if (op.a === 'login') {
       const result = await login(req, getDb(), op.member, op.code, env)
       if (result.error) return reply({ ok: false, error: result.error }, result.error === 'locked' ? 429 : 401)

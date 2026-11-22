@@ -7,6 +7,12 @@ const duration = 30 * 86400
 const digest = (value: string) => createHash('sha256').update(value).digest()
 const same = (a: string, b: string) => timingSafeEqual(digest(a), digest(b))
 
+export function charlieSkillAuthorized(req: Request, env: NodeJS.ProcessEnv) {
+  const secret = env.CHARLIE_SKILL_SECRET
+  const authorization = req.headers.get('authorization')
+  return !!secret && secret.length >= 32 && !!authorization?.startsWith('Bearer ') && same(authorization.slice(7), secret)
+}
+
 function memberCode(member: Member, env: NodeJS.ProcessEnv) {
   const code = member === 'p1' ? env.MEMBER_1_CODE : env.MEMBER_2_CODE
   return code && code.length >= 32 && code !== (member === 'p1' ? env.MEMBER_2_CODE : env.MEMBER_1_CODE) ? code : null
