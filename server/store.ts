@@ -65,6 +65,12 @@ export async function snapshot(db: Client, env: NodeJS.ProcessEnv, member: Membe
 export async function applyMutation(db: Client, op: Mutation, member: Member) {
   const collection = op.a === 'setting' ? 'settings' : op.t
   const id = op.a === 'setting' ? op.name : op.id
+  const existing = await db.execute({ sql: 'SELECT * FROM mutations WHERE id = ?', args: [op.operationId] })
+  if (existing.rows[0]) {
+    const receipt = existing.rows[0]
+    if (receipt.collection !== collection || receipt.record_id !== id || receipt.base_revision !== op.revision) return { ok: false, error: 'operation' }
+    return receipt.applied === 1 ? { ok: true, revision: op.revision + 1 } : { ok: false, error: 'conflict' }
+  }
   let value = op.a === 'put' ? op.row : op.a === 'setting' ? op.value : null
   if (op.a === 'put' && op.t === 'projects') {
     const previous = await db.execute({ sql: "SELECT data FROM records WHERE collection = 'projects' AND id = ?", args: [op.id] })
@@ -74,6 +80,9 @@ export async function applyMutation(db: Client, op: Mutation, member: Member) {
     const metadata = projectMetadata(op.row) || {}
     metadata.createdBy = previousMetadata.createdBy === 'p1' || previousMetadata.createdBy === 'p2' ? previousMetadata.createdBy : member
     metadata.visibility = metadata.visibility === 'private' ? 'private' : 'household'
+    if (previousValue && metadata.visibility !== (previousMetadata.visibility === 'private' ? 'private' : 'household') && metadata.createdBy !== member) {
+      return { ok: false, error: 'forbidden' }
+    }
     const wasDone = projectDone(previousValue, previousMetadata)
     const isDone = projectDone(op.row, metadata)
     if (isDone && !wasDone) metadata.completedBy = member

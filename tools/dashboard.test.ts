@@ -76,10 +76,16 @@ test('sessions, household state, repeated requests, and stale offline edits', as
       row: ['shared', '✨', 'Quête commune', '', '', '{}'],
     }
     assert.deepEqual(await (await call(sharedQuest, cookie1)).json(), { ok: true, revision: 1 })
+    const stolenVisibility = {
+      ...sharedQuest, revision: 1, operationId: randomUUID(),
+      row: ['shared', '✨', 'Quête commune', '', '', JSON.stringify({ visibility: 'private' })],
+    }
+    assert.equal((await call(stolenVisibility, cookie2)).status, 403)
     const completedQuest = {
       ...sharedQuest, revision: 1, operationId: randomUUID(),
       row: ['shared', '✨', 'Quête commune', '', '', JSON.stringify({ status: 'done' })],
     }
+    assert.deepEqual(await (await call(completedQuest, cookie2)).json(), { ok: true, revision: 2 })
     assert.deepEqual(await (await call(completedQuest, cookie2)).json(), { ok: true, revision: 2 })
     const scored = await (await call({ a: 'load' }, cookie1)).json()
     assert.deepEqual(scored.questScores, { p1: 0, p2: 1 })
