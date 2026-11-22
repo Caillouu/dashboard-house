@@ -34,6 +34,7 @@ export async function snapshot(db: Client, env: NodeJS.ProcessEnv, member: Membe
     revisions: {},
     people: { p1: env.PERSON_1?.slice(0, 30) || 'Membre 1', p2: env.PERSON_2?.slice(0, 30) || 'Membre 2' },
     questScores: { p1: 0, p2: 0 },
+    routineScores: { p1: 0, p2: 0 },
   }
   for (const row of rows) {
     const collection = String(row.collection)
@@ -43,6 +44,11 @@ export async function snapshot(db: Client, env: NodeJS.ProcessEnv, member: Membe
       continue
     }
     const value = JSON.parse(String(row.data))
+    if (collection === 'routine_completions') {
+      const completedBy = String(value.member)
+      if (completedBy === 'p1' || completedBy === 'p2') data.routineScores[completedBy]++
+      continue
+    }
     if (collection === 'projects') {
       const metadata = projectMetadata(value)!
       const isPrivate = metadata.visibility === 'private'
@@ -72,6 +78,24 @@ export async function applyMutation(db: Client, op: Mutation, member: Member) {
     return receipt.applied === 1 ? { ok: true, revision: op.revision + 1 } : { ok: false, error: 'conflict' }
   }
   let value = op.a === 'put' ? op.row : op.a === 'setting' ? op.value : null
+  let routineCompletion: { routineId: string; completedDate: string } | null = null
+  let routineUndo: { routineId: string; completedDate: string } | null = null
+  if (op.a === 'put' && op.t === 'routines') {
+    const previous = await db.execute({ sql: "SELECT data FROM records WHERE collection = 'routines' AND id = ?", args: [op.id] })
+    const previousValue = previous.rows[0]?.data ? JSON.parse(String(previous.rows[0].data)) : null
+    const previousDate = Array.isArray(previousValue) ? String(previousValue[4] || '') : ''
+    const completedDate = String(op.row[4] || '')
+    let previousMetadata: Record<string, unknown> = {}, metadata: Record<string, unknown> = {}
+    try { previousMetadata = JSON.parse(String(Array.isArray(previousValue) ? previousValue[7] || '{}' : '{}')) }
+    catch { previousMetadata = {} }
+    try { metadata = JSON.parse(String(op.row[7] || '{}')) }
+    catch { metadata = {} }
+    if (completedDate && completedDate !== previousDate && metadata.hasPrev === true) {
+      routineCompletion = { routineId: op.id, completedDate }
+    } else if (previousDate && completedDate !== previousDate && previousMetadata.hasPrev === true && metadata.hasPrev !== true) {
+      routineUndo = { routineId: op.id, completedDate: previousDate }
+    }
+  }
   if (op.a === 'put' && op.t === 'projects') {
     const previous = await db.execute({ sql: "SELECT data FROM records WHERE collection = 'projects' AND id = ?", args: [op.id] })
     const previousValue = previous.rows[0]?.data ? JSON.parse(String(previous.rows[0].data)) : null
@@ -96,13 +120,29 @@ export async function applyMutation(db: Client, op: Mutation, member: Member) {
     if (previousMetadata.visibility === 'private' && previousMetadata.createdBy !== member) return { ok: false, error: 'forbidden' }
   }
   const data = value === null ? null : JSON.stringify(value)
-  const [, result] = await db.batch([
+  const statements = [
     {
       sql: 'INSERT INTO mutations (id, collection, record_id, data, base_revision) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING',
       args: [op.operationId, collection, id, data, op.revision],
     },
-    { sql: 'SELECT * FROM mutations WHERE id = ?', args: [op.operationId] },
-  ], 'write')
+  ]
+  if (routineCompletion) statements.push({
+    sql: `INSERT INTO records (collection, id, data, revision)
+      SELECT 'routine_completions', ?, ?, 1
+      WHERE EXISTS (SELECT 1 FROM mutations WHERE id = ? AND applied = 1)`,
+    args: [op.operationId, JSON.stringify({ ...routineCompletion, member }), op.operationId],
+  })
+  if (routineUndo) statements.push({
+    sql: `DELETE FROM records WHERE collection = 'routine_completions' AND id = (
+      SELECT id FROM records WHERE collection = 'routine_completions'
+      AND json_extract(data, '$.routineId') = ? AND json_extract(data, '$.completedDate') = ?
+      ORDER BY rowid DESC LIMIT 1
+    ) AND EXISTS (SELECT 1 FROM mutations WHERE id = ? AND applied = 1)`,
+    args: [routineUndo.routineId, routineUndo.completedDate, op.operationId],
+  })
+  statements.push({ sql: 'SELECT * FROM mutations WHERE id = ?', args: [op.operationId] })
+  const results = await db.batch(statements, 'write')
+  const result = results.at(-1)!
   const receipt = result.rows[0]
   if (receipt.collection !== collection || receipt.record_id !== id || receipt.data !== data || receipt.base_revision !== op.revision) {
     return { ok: false, error: 'operation' }

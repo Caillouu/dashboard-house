@@ -49,4 +49,5 @@ export type Snapshot = {
   revisions: Record<string, number>
   people: { p1: string; p2: string }
   questScores: { p1: number; p2: number }
+  routineScores: { p1: number; p2: number }
 }

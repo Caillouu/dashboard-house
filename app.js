@@ -36,7 +36,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
 
   function lockSession(message){
     KEY=null;sessionEpoch++;lsSet(LS_KEY,null);clearTimeout(cacheT);
-    S={projects:[],routines:[],shop:[],courses:[],voyages:[],debts:[]};PEOPLE={p1:'',p2:''};QUEST_SCORES={p1:0,p2:0};
+    S={projects:[],routines:[],shop:[],courses:[],voyages:[],debts:[]};PEOPLE={p1:'',p2:''};QUEST_SCORES={p1:0,p2:0};ROUTINE_SCORES={p1:0,p2:0};
     cal={status:'loading',events:[]};W=null;HID=[];EVN={};if(typeof agHidden!=='undefined')agHidden.clear();sig='';fromCache=false;
     if(typeof weatherSlide!=='undefined'){weatherSlide=0;weatherDates=[null,null];weatherTouch=null;weatherMascots=[randomMascot(),randomMascot()]}
     vOpen=null;render();renderCal();renderWeather();showLogin(message);
@@ -84,7 +84,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
   var URG={'un jour':'low',low:'low',bientot:'med',med:'med',vite:'high',high:'high',urgent:'high'};
   var URGL={low:'Un jour',med:'Bientôt',high:'Vite'};
   var DONE_RE=/^(✓|✔|✅|\[x\]|x\s)\s*/i;
-  var PEOPLE={p1:'',p2:''},QUEST_SCORES={p1:0,p2:0}; /* prénoms : réglés dans le script Google, jamais dans le code */
+  var PEOPLE={p1:'',p2:''},QUEST_SCORES={p1:0,p2:0},ROUTINE_SCORES={p1:0,p2:0}; /* prénoms : réglés dans le script Google, jamais dans le code */
   function setPeople(pp){pp=pp||{};PEOPLE={p1:String(pp.p1||'').slice(0,30),p2:String(pp.p2||'').slice(0,30)}}
   function fromRow(k,r,i){var c=SHT[k].cols,o={},t={};
     try{t=JSON.parse(r[c.indexOf('_t')]||'{}')||{}}catch(e){t={}}
@@ -142,6 +142,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     if(s===sig)return;sig=s;
     setPeople(j.people);
     QUEST_SCORES={p1:Number(j.questScores&&j.questScores.p1)||0,p2:Number(j.questScores&&j.questScores.p2)||0};
+    ROUTINE_SCORES={p1:Number(j.routineScores&&j.routineScores.p1)||0,p2:Number(j.routineScores&&j.routineScores.p2)||0};
     Object.keys(SHT).forEach(function(k){
       S[k]=j.sheets[k].map(function(r,i){return fromRow(k,r,i)}).filter(function(row){return row.id&&row.title});
     });
@@ -464,6 +465,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     return out.sort(function(a,b){return a.at-b.at})}
   function groupTasks(g){return S.routines.filter(function(r){return !r.grp&&nrm(r.group)===nrm(g)})}
   function renderCare(){
+    renderRoutineScore();
     GROUPS.forEach(function(g){
       var list=S.routines.filter(function(r){return !r.grp&&r.group===g}).sort(sortCare);
       $('l-'+g).innerHTML=list.length?list.map(g==='Plantes'?plantTile:careRow).join(''):empty('routines','Rien ici pour le moment.');
@@ -819,11 +821,13 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
   var qtCat='all';try{qtCat=localStorage.getItem('maison-qcat')||'all'}catch(e){}if(qtCat!=='all'&&!QCATL[qtCat])qtCat='all';
   /* Onglet Quêtes : la quête principale mise en avant (avec Kimchi), puis les quêtes secondaires */
   var qtDone=false;
+  function renderMemberScore(id,scores,label){var el=$(id);if(!el)return;var a=scores.p1||0,b=scores.p2||0,total=a+b,pct=total?Math.round(a/total*100):50;
+    el.innerHTML='<div class="qscore-labels"><span><i class="blue"></i>'+esc(PEOPLE.p1||'Pierre')+' <b>'+a+'</b></span><span><b>'+b+'</b> '+esc(PEOPLE.p2||'Justine')+'<i class="pink"></i></span></div><div class="qscore-bar" role="img" aria-label="'+label+' : '+esc(PEOPLE.p1||'Pierre')+' '+a+', '+esc(PEOPLE.p2||'Justine')+' '+b+'"><i class="blue" style="width:'+pct+'%"></i><i class="pink" style="width:'+(100-pct)+'%"></i></div>'}
+  function renderRoutineScore(){renderMemberScore('routine-score',ROUTINE_SCORES,'Routines terminées')}
   var qPrivacyT=null;
   function qPrivacyNotice(on){var el=$('q-privacy-note');if(!el)return;clearTimeout(qPrivacyT);el.className='qprivacy-note'+(on?' private':'');el.textContent=on?'👻 Cette quête sera visible seulement par toi.':'🏠 Cette quête sera visible par '+(PEOPLE.p1||'Pierre')+' et '+(PEOPLE.p2||'Justine')+'.';el.hidden=false;qPrivacyT=setTimeout(function(){el.hidden=true},2600)}
   function setNewQuestPrivacy(on,announce){var b=$('q-private');if(!b)return;b.setAttribute('aria-pressed',String(on));b.setAttribute('aria-label',on?'Rendre la quête visible par tout le foyer':'Rendre la quête visible seulement par moi');b.title=on?'Quête privée : toucher pour la partager':'Quête partagée : toucher pour la rendre privée';if(announce)qPrivacyNotice(on)}
-  function renderQuestScore(){var el=$('q-score');if(!el)return;var a=QUEST_SCORES.p1||0,b=QUEST_SCORES.p2||0,total=a+b,pct=total?Math.round(a/total*100):50;
-    el.innerHTML='<div class="qscore-labels"><span><i class="blue"></i>'+esc(PEOPLE.p1||'Pierre')+' <b>'+a+'</b></span><span><b>'+b+'</b> '+esc(PEOPLE.p2||'Justine')+'<i class="pink"></i></span></div><div class="qscore-bar" role="img" aria-label="Quêtes partagées terminées : '+esc(PEOPLE.p1||'Pierre')+' '+a+', '+esc(PEOPLE.p2||'Justine')+' '+b+'"><i class="blue" style="width:'+pct+'%"></i><i class="pink" style="width:'+(100-pct)+'%"></i></div>'}
+  function renderQuestScore(){renderMemberScore('q-score',QUEST_SCORES,'Quêtes partagées terminées')}
   function renderQTab(){var L=$('qt-list');if(!L||TAB!=='quetes')return;
     renderQuestScore();
     var ae=document.activeElement;if(ae&&$('qtab').contains(ae)&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&ae.value)return;
@@ -1480,17 +1484,17 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
 
   /* Mémoire locale : dernières données connues, affichées si le réseau manque */
   var cacheT=null,fromCache=false;
-  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,QS:QUEST_SCORES,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))}
+  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,QS:QUEST_SCORES,RS:ROUTINE_SCORES,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))}
   window.addEventListener('pagehide',cacheNow);document.addEventListener('visibilitychange',function(){if(document.hidden)cacheNow()});
   function cacheSave(){
     if(fromCache||!KEY)return;clearTimeout(cacheT);
-    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,QS:QUEST_SCORES,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))},600);
+    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,QS:QUEST_SCORES,RS:ROUTINE_SCORES,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))},600);
   }
   function cacheLoad(){
     try{
       var c=JSON.parse(lsGet(CK)||'null');if(!c||!c.S)return false;
       ['projects','routines','shop','courses','voyages','debts'].forEach(function(k){S[k]=Array.isArray(c.S[k])?c.S[k]:[];loaded[k]=true});
-      revisions=c.revisions||{};setPeople(c.P);QUEST_SCORES={p1:Number(c.QS&&c.QS.p1)||0,p2:Number(c.QS&&c.QS.p2)||0};W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
+      revisions=c.revisions||{};setPeople(c.P);QUEST_SCORES={p1:Number(c.QS&&c.QS.p1)||0,p2:Number(c.QS&&c.QS.p2)||0};ROUTINE_SCORES={p1:Number(c.RS&&c.RS.p1)||0,p2:Number(c.RS&&c.RS.p2)||0};W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
       overlayOutbox(); /* modifs faites hors ligne et pas encore envoyées */
       if(Array.isArray(c.cal))cal={status:'ok',events:c.cal,calendars:Array.isArray(c.calendars)?c.calendars:[]};
       fromCache=c.t;return true;

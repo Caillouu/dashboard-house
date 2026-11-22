@@ -932,6 +932,8 @@ body[data-tab="quetes"] .qtab{display:flex;flex-direction:column;gap:14px;max-wi
 .ptitle{display:none;align-items:center;gap:12px;padding:4px 2px;max-width:1180px;width:100%;margin:0 auto}
 .ptitle h2{font-size:28px;flex:1}
 .ptitle .mini{font-size:12px;padding:7px 14px;margin:0}
+.rscore{display:none;max-width:1180px;width:100%;margin:-8px auto 0;padding:0 2px}
+body[data-tab="maison"] .rscore{display:flex}
 body[data-tab="maison"] .ptitle,body[data-tab="courses"] .ptitle,body[data-tab="voyage"] .ptitle{display:flex}
 body[data-tab="voyage"] .s-voyage>.ch{display:none}
 body[data-tab="voyage"] .grid>.s-voyage{background:none;box-shadow:none;padding:0}

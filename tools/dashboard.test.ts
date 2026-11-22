@@ -102,6 +102,31 @@ test('sessions, household state, repeated requests, and stale offline edits', as
       status: 'done', createdBy: 'p1', visibility: 'household', completedBy: 'p2',
     })
 
+    const routine = {
+      a: 'put', t: 'routines', id: 'dishes', revision: 0, operationId: randomUUID(),
+      row: ['dishes', 'Maison', '🍽️', 'Vaisselle', '', '1', 'jours', '{}'],
+    }
+    assert.deepEqual(await (await call(routine, cookie1)).json(), { ok: true, revision: 1 })
+    const doneByPierre = {
+      ...routine, revision: 1, operationId: randomUUID(),
+      row: ['dishes', 'Maison', '🍽️', 'Vaisselle', '2026-11-22', '1', 'jours', JSON.stringify({ hasPrev: true, prevDone: null })],
+    }
+    assert.deepEqual(await (await call(doneByPierre, cookie1)).json(), { ok: true, revision: 2 })
+    assert.deepEqual(await (await call(doneByPierre, cookie1)).json(), { ok: true, revision: 2 })
+    assert.deepEqual((await (await call({ a: 'load' }, cookie2)).json()).routineScores, { p1: 1, p2: 0 })
+    const doneByJustine = {
+      ...routine, revision: 2, operationId: randomUUID(),
+      row: ['dishes', 'Maison', '🍽️', 'Vaisselle', '2026-11-23', '1', 'jours', JSON.stringify({ hasPrev: true, prevDone: '2026-11-22' })],
+    }
+    assert.deepEqual(await (await call(doneByJustine, cookie2)).json(), { ok: true, revision: 3 })
+    assert.deepEqual((await (await call({ a: 'load' }, cookie1)).json()).routineScores, { p1: 1, p2: 1 })
+    const undoJustine = {
+      ...routine, revision: 3, operationId: randomUUID(),
+      row: ['dishes', 'Maison', '🍽️', 'Vaisselle', '2026-11-22', '1', 'jours', '{}'],
+    }
+    assert.deepEqual(await (await call(undoJustine, cookie2)).json(), { ok: true, revision: 4 })
+    assert.deepEqual((await (await call({ a: 'load' }, cookie1)).json()).routineScores, { p1: 1, p2: 0 })
+
     const newer = {
       ...first, revision: 1, operationId: randomUUID(),
       row: ['item', '🥛', 'Lait', '2', '', 'oui', '{}'],
