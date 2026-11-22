@@ -158,6 +158,8 @@ test('sessions, household state, repeated requests, and stale offline edits', as
     assert.equal(deleted.revisions['courses:item'], 3)
     assert.equal((await call({ ...first, operationId: randomUUID(), row: ['invalid'] }, cookie1)).status, 400)
     assert.deepEqual(await (await call({ a: 'agenda' }, cookie1)).json(), { ok: true, events: [], calendars: [] })
+    assert.deepEqual(await (await call({ a: 'agendaSearch', from: '2027-01-12', to: '2027-01-14' }, cookie1)).json(), { ok: true, events: [], calendars: [] })
+    assert.equal((await call({ a: 'agendaSearch', from: '2027-01-14', to: '2027-01-12' }, cookie1)).status, 400)
     assert.match((await call({ a: 'logout' }, cookie1)).headers.get('set-cookie')!, /Max-Age=0/)
   } finally {
     db.close()
