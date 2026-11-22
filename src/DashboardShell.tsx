@@ -45,6 +45,20 @@ export function DashboardShell() {
     <form id="f-qadd3" className="addform qadd" hidden><input className="in" id="q-title3" required maxLength={80} placeholder="Une idée ?" aria-label="Nouvelle quête" /><button id="q-private" className="qghost" type="button" data-act="qprivate-new" aria-pressed="false" aria-label="Rendre la quête visible seulement par moi" title="Quête partagée : toucher pour la rendre privée">👻</button><button className="btn" type="submit">Ajouter</button></form>
     <div id="qt-list" className="qt-list"></div>
   </section>
+  <section id="debts-tab" className="debts-tab" aria-labelledby="debts-title">
+    <header className="debts-head">
+      <div><h2 id="debts-title">Dettes</h2><p>Les dépenses avancées pour le foyer.</p></div>
+      <button className="lnk del debts-clear" type="button" data-act="debts-clear">Tout effacer</button>
+    </header>
+    <form id="f-debt" className="debt-form" autoComplete="off">
+      <label>Pourquoi ?<input className="in" id="debt-title" required maxLength={80} placeholder="Ex. Courses du dimanche" /></label>
+      <label>Montant<input className="in" id="debt-amount" name="amount" type="number" required min="0.01" max="999999.99" step="0.01" inputMode="decimal" placeholder="0,00" /></label>
+      <label>Qui a payé ?<select className="in" id="debt-payer" name="payer"><option value="p1">Personne 1</option><option value="p2">Personne 2</option></select></label>
+      <button className="btn" type="submit">Ajouter</button>
+    </form>
+    <div id="debts-list" className="debts-list" aria-live="polite"></div>
+    <div id="debts-balance" className="debts-balance" aria-live="polite"></div>
+  </section>
   <div id="q-privacy-note" className="qprivacy-note" role="status" aria-live="polite" hidden></div>
 </div>
 <nav className="tabbar" aria-label="Sections">
@@ -53,7 +67,17 @@ export function DashboardShell() {
   <button type="button" data-act="tab" data-tab="courses" aria-label="Courses et wishlist"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2l2 10h10l2-7H7"/><circle cx="9.5" cy="19" r="1.3"/><circle cx="16.5" cy="19" r="1.3"/></svg><span>Courses</span></button>
   <button type="button" data-act="tab" data-tab="maison" aria-label="Routines"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.5-4.6L4 8M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.5 4.6L20 16m0 4.5V16h-4.5"/><path d="M9 12l2 2 4-4"/></svg><span>Routines</span></button>
   <button type="button" data-act="tab" data-tab="voyage" aria-label="Voyages"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2.5"/><path d="M9 8V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V8M9 12v4M15 12v4"/></svg><span>Voyages</span></button>
+  <button type="button" data-act="tab" data-tab="dettes" aria-label="Dettes"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5c-.8-.7-1.8-1-3-1-1.9 0-3.5 1.2-3.5 2.8s1.4 2.3 3.2 2.7 3.1 1 3.1 2.6-1.5 2.9-3.6 2.9c-1.3 0-2.5-.4-3.3-1.2M12 5.5v2M12 18.5v-2"/></svg><span>Dettes</span></button>
 </nav>
+<dialog id="debts-clear-dialog" className="confirm-dialog" aria-labelledby="debts-clear-title" aria-describedby="debts-clear-description">
+  <div className="confirm-dialog-icon" aria-hidden="true">↺</div>
+  <h2 id="debts-clear-title">Repartir de zéro ?</h2>
+  <p id="debts-clear-description">Toutes les dépenses seront supprimées. Cette action ne pourra pas être annulée.</p>
+  <div className="confirm-dialog-actions">
+    <button className="btn ghost" type="button" data-act="debts-clear-cancel">Annuler</button>
+    <button className="btn danger" type="button" data-act="debts-clear-confirm">Tout effacer</button>
+  </div>
+</dialog>
 <section id="cview" className="qview cview" hidden aria-label="Liste de courses">
   <div className="qv-in">
     <header className="qv-head">
