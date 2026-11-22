@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { createClient } from '@libsql/client'
 import { dashboard } from '../server/handler.ts'
 import { migrate } from './migrate.ts'
 import { mascotPhrase, randomMascot } from '../src/mascot.ts'
 import { isDisplayableRecord } from '../src/records.ts'
+
+test('every static routine group has a matching dashboard container', () => {
+  const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8')
+  const shell = readFileSync(new URL('../src/DashboardShell.tsx', import.meta.url), 'utf8')
+  const groups = app.match(/var GROUPS=\[([^\]]+)\]/)?.[1].match(/'[^']+'/g)?.map(value => value.slice(1, -1)) ?? []
+  assert.ok(groups.length > 0)
+  for (const group of groups) assert.match(shell, new RegExp('id=["{]?["\']l-' + group + '["\']'))
+})
 
 test('mascots alternate and keep their matching phrase', () => {
   const first = randomMascot()
