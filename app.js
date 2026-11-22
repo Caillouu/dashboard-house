@@ -10,7 +10,7 @@ import { isDisplayableRecord } from './src/records.ts'
      cliquer sur des boutons de l'app à l'insu de la personne). */
   if(window.top!==window.self){document.documentElement.textContent='Cette application ne peut pas s\'afficher à l\'intérieur d\'un autre site.';return}
   var S={projects:[],routines:[],shop:[],courses:[],voyages:[],debts:[]};
-  var GROUPS=['Joey','Charlie','Plantes','Maison'];
+  var GROUPS=['Joey','Charlie','Justine','Plantes','Maison'];
   var PRIO={high:'Urgent',med:'Pas urgent',low:'Idée'}, PW={high:3,med:2,low:1}, PEMO={high:'🔥',med:'⏳',low:'💡'};
   /* Urgence d'une quête : juste un émoji ; un appui ouvre un petit menu (🔥 Urgent, ⏳ Pas urgent, 💡 Idée) */
   function prioBtn(o){var p=PRIO[o.prio]?o.prio:'med';return '<button type="button" class="prb '+p+'" data-act="prio-menu" data-id="'+esc(o.id)+'" aria-haspopup="menu" aria-label="Urgence : '+PRIO[p]+'" title="'+PRIO[p]+'">'+PEMO[p]+'</button>'}
@@ -724,7 +724,7 @@ import { isDisplayableRecord } from './src/records.ts'
     else if(v==='agenda'){setTab('agenda')}}
   /* Routines : checklist globale de tout ce qui est en retard (rouge) ou bientôt dû (orange) */
   function renderTodoAll(){var el=$('l-todoall');if(!el)return;
-    var R={r:0,o:1},GL={Joey:'Joey',Charlie:'Charlie',Plantes:'Plantes',Maison:'Maison'};
+    var R={r:0,o:1},GL={Joey:'Joey',Charlie:'Charlie',Justine:'Justine',Plantes:'Plantes',Maison:'Maison'};
     var L=S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue)
       .sort(function(a,b){if(R[a.st.c]!==R[b.st.c])return R[a.st.c]-R[b.st.c];return (a.r.lastDone||'')<(b.r.lastDone||'')?-1:1});
     var td=iso(new Date()),dn=S.routines.filter(function(r){return r.lastDone===td}).length,c=$('ta-count');if(c)c.textContent=dn?dn+'/'+(L.length+dn):'';   /* jamais « 0/N » */
