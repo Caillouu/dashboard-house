@@ -978,12 +978,17 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     list.innerHTML=rows.length?rows.map(function(d){return '<article class="debt-row"><div><h3>'+esc(d.title)+'</h3><p>Payé par '+esc(whoLabel(d.payer))+'</p></div><strong>'+esc(money(d.amount))+'</strong><button type="button" class="debt-del" data-act="debt-del" data-id="'+esc(d.id)+'" aria-label="Supprimer la dette '+esc(d.title)+'">×</button></article>'}).join('')
       :'<div class="debts-empty"><span aria-hidden="true">✓</span><h3>Les comptes sont à zéro</h3><p>Ajoute une dépense avancée pour le foyer.</p></div>';
     var paid1=S.debts.reduce(function(total,d){return total+(d.payer==='p1'?Number(d.amount)||0:-(Number(d.amount)||0))},0),owed=Math.round(Math.abs(paid1)*50)/100;
-    if(owed<0.01)balance.innerHTML='<span>Solde</span><strong>Personne ne doit rien 🎉</strong>';
-    else{var creditor=paid1>0?'p1':'p2',debtor=creditor==='p1'?'p2':'p1';balance.innerHTML='<span>Solde total</span><strong>'+esc(whoLabel(debtor))+' doit '+esc(money(owed))+' à '+esc(whoLabel(creditor))+'</strong>'}
+    balance.hidden=!rows.length;
+    if(rows.length&&owed<0.01)balance.innerHTML='<span>Solde total</span><strong>Les dépenses s’équilibrent 🎉</strong>';
+    else if(rows.length){var creditor=paid1>0?'p1':'p2',debtor=creditor==='p1'?'p2':'p1';balance.innerHTML='<span>Solde total</span><strong>'+esc(whoLabel(debtor))+' doit '+esc(money(owed))+' à '+esc(whoLabel(creditor))+'</strong>'}
     var clear=document.querySelector('.debts-clear');if(clear)clear.hidden=!rows.length;
   }
+  function openDebtClear(){
+    var dialog=$('debts-clear-dialog');if(!dialog||!S.debts.length)return;
+    dialog.showModal();setTimeout(function(){var cancelButton=dialog.querySelector('[data-act="debts-clear-cancel"]');if(cancelButton)cancelButton.focus()},0);
+  }
   function clearDebts(){
-    if(!S.debts.length||!confirm('Effacer toutes les dettes et repartir de zéro ?'))return;
+    var dialog=$('debts-clear-dialog');if(dialog&&dialog.open)dialog.close();
     S.debts.slice().forEach(function(d){delDoc('debts',d.id)});toastMsg('Toutes les dettes ont été effacées');
   }
 
@@ -1615,7 +1620,9 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     else if(a==='c-clear'){clearCart()}
     else if(a==='c-unclear'){unclearCart()}
     else if(a==='debt-del'){delUndo('debts',id,'Dette supprimée')}
-    else if(a==='debts-clear'){clearDebts()}
+    else if(a==='debts-clear'){openDebtClear()}
+    else if(a==='debts-clear-cancel'){var debtDialog=$('debts-clear-dialog');if(debtDialog)debtDialog.close()}
+    else if(a==='debts-clear-confirm'){clearDebts()}
     else if(a==='cview-open'){cview(true,true)}
     else if(a==='cview-close'){cview(false,true)}
     else if(a==='qview-open'){setTab('quetes')}

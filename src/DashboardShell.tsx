@@ -68,6 +68,15 @@ export function DashboardShell() {
   <button type="button" data-act="tab" data-tab="voyage" aria-label="Voyages"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2.5"/><path d="M9 8V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V8M9 12v4M15 12v4"/></svg><span>Voyages</span></button>
   <button type="button" data-act="tab" data-tab="dettes" aria-label="Dettes"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5c-.8-.7-1.8-1-3-1-1.9 0-3.5 1.2-3.5 2.8s1.4 2.3 3.2 2.7 3.1 1 3.1 2.6-1.5 2.9-3.6 2.9c-1.3 0-2.5-.4-3.3-1.2M12 5.5v2M12 18.5v-2"/></svg><span>Dettes</span></button>
 </nav>
+<dialog id="debts-clear-dialog" className="confirm-dialog" aria-labelledby="debts-clear-title" aria-describedby="debts-clear-description">
+  <div className="confirm-dialog-icon" aria-hidden="true">↺</div>
+  <h2 id="debts-clear-title">Repartir de zéro ?</h2>
+  <p id="debts-clear-description">Toutes les dépenses seront supprimées. Cette action ne pourra pas être annulée.</p>
+  <div className="confirm-dialog-actions">
+    <button className="btn ghost" type="button" data-act="debts-clear-cancel">Annuler</button>
+    <button className="btn danger" type="button" data-act="debts-clear-confirm">Tout effacer</button>
+  </div>
+</dialog>
 <section id="cview" className="qview cview" hidden aria-label="Liste de courses">
   <div className="qv-in">
     <header className="qv-head">
