@@ -148,11 +148,14 @@ def main():
                     page.click('[data-act="ag-create-toggle"]'); page.wait_for_timeout(150)
                     assert page.is_visible('#ag-create-form') and not page.is_visible('.ag-list'), 'ajout agenda en vue dédiée'
                     assert page.locator('#ag-create-form [name="calendarId"]').count() == 1, 'choix du Google Agenda'
-                    assert page.is_visible('#ag-create-form .qcal'), 'même calendrier que la recherche'
+                    assert not page.is_visible('#ag-create-form .qcal'), 'calendrier masqué avant le clic'
+                    page.click('#ag-create-form [data-field="start"]')
+                    assert page.is_visible('#ag-create-form .qcal'), 'même calendrier que la recherche au clic sur la date'
+                    page.click('#ag-create-form [data-field="start"]')
                     assert page.locator('#ag-create-form [name="startHour"] option').count() == 24, 'heures de début'
                     assert page.locator('#ag-create-form [name="endMinute"] option').count() == 12, 'minutes de fin'
                     page.click('#ag-create-form [data-days="2"]')
-                    assert page.locator('#ag-create-form .ag-create-bound').count() == 2, 'début et fin côte à côte'
+                    assert page.locator('#ag-create-form .ag-create-bound').count() == 2, 'début et fin sur deux lignes'
                     page.fill('#ag-create-form [name="title"]', 'Dentiste')
                     page.click('#ag-create-form [type="submit"]'); page.wait_for_timeout(250)
                     assert not page.is_visible('#ag-create-form'), 'fermeture après ajout agenda'
