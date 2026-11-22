@@ -610,12 +610,15 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     el.innerHTML=h}
   /* ---- Onglet Agenda : ce qui va se passer dans les prochains jours et semaines ---- */
   var agSel=null,agHidden=new Set();
+  function agTone(name){var n=nrm(name);return n.indexOf('jupiter')>=0?'jupiter':n.indexOf('pierre')>=0?'pierre':n.indexOf('perso')>=0?'perso':'other'}
   function renderAgenda(){var el=$('agtab');if(!el||TAB!=='agenda')return;
     var t0d=t0(),items=[],now=new Date();
     var calendars=cal.calendars||[],focused=document.activeElement,focusId=focused&&el.contains(focused)?focused.getAttribute('data-calendar'):null;
-    var filters=calendars.map(function(c){return '<button type="button" class="ag-filter" data-act="ag-filter" data-calendar="'+esc(c.id)+'" aria-pressed="'+!agHidden.has(c.id)+'" title="'+esc(c.name)+'">'+esc(c.name)+'</button>'}).join('');
+    var tones=new Map(calendars.map(function(c){return [c.id,agTone(c.name)]}));
+    var filters=calendars.map(function(c){var on=!agHidden.has(c.id);return '<button type="button" class="ag-filter ag-tone-'+agTone(c.name)+'" data-act="ag-filter" data-calendar="'+esc(c.id)+'" aria-pressed="'+on+'" title="'+(on?'Masquer ':'Afficher ')+esc(c.name)+'">'+esc(c.name)+'</button>'}).join('');
     if(cal.status==='ok')cal.events.forEach(function(e){if(!e||HID.indexOf(e.id)>=0||(e.calendars&&e.calendars.every(function(id){return agHidden.has(id)})))return;var i=evInfo(e);if(!i||i.n<0)return;if(i.n===0&&!i.allDay&&i.d<now&&now-i.d>3*36e5)return;
-      items.push({n:i.n,k:i.allDay?'':i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),t:eventTitle(e,'Sans titre'),id:e.id,type:'ev'})});
+      var visibleCalendar=(e.calendars||[]).filter(function(id){return !agHidden.has(id)})[0];
+      items.push({n:i.n,k:i.allDay?'':i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),t:eventTitle(e,'Sans titre'),id:e.id,type:'ev',tone:tones.get(visibleCalendar)||'other'})});
     trips().forEach(function(t){var sp=tripSpan(t);if(!sp.s)return;var a=diff(sp.s),b=sp.e?diff(sp.e):a;
       if(a>=0&&a<=60)items.push({n:a,k:hPart(t.start),t:'Départ · '+t.title,em:tEmo(t),id:t.id,type:'trip'});
       if(b>=0&&b<=60&&b!==a)items.push({n:b,k:hPart(t.end),t:'Retour · '+t.title,em:'🏠',id:t.id,type:'trip'})});
@@ -632,7 +635,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
         var d=new Date(t0d);d.setDate(d.getDate()+x.n);var day=x.n===0?'Aujourd\'hui':x.n===1?'Demain':cap(d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'}).replace('.',''));
         var k='<span class="ag-k'+(x.n===0?' td':'')+'"><b>'+esc(day)+'</b>'+(x.k?esc(x.k):'Journée')+'</span>';
         return x.type==='trip'?'<button class="ag-it trip" data-act="trip-open" data-id="'+esc(x.id)+'">'+k+'<span class="ag-t">'+esc(x.em+' '+x.t)+'</span></button>'
-          :'<div class="ag-it" role="button" tabindex="0" data-act="ev-edit" data-id="'+esc(x.id)+'">'+k+'<span class="ag-t">'+esc(x.t)+'</span><button class="evx" data-act="ev-hide" data-id="'+esc(x.id)+'" aria-label="Masquer" title="Masquer">×</button></div>'}).join('')
+          :'<div class="ag-it ag-tone-'+x.tone+'" role="button" tabindex="0" data-act="ev-edit" data-id="'+esc(x.id)+'">'+k+'<span class="ag-t">'+esc(x.t)+'</span><button class="evx" data-act="ev-hide" data-id="'+esc(x.id)+'" aria-label="Masquer" title="Masquer">×</button></div>'}).join('')
         :'<p class="ag-none">'+(cal.status==='ok'?'Rien de prévu 🐾':cal.status==='loading'?'Chargement…':'—')+'</p>')+'</section>'}
     if(cal.status!=='ok'&&cal.status!=='loading')body='<p class="empty">L\'agenda ne répond pas pour le moment.</p>'+body;
     var nHid=cal.status==='ok'?cal.events.filter(function(e){return e&&HID.indexOf(e.id)>=0}).length:0;
