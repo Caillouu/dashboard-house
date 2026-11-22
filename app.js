@@ -817,6 +817,9 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
   var qtCat='all';try{qtCat=localStorage.getItem('maison-qcat')||'all'}catch(e){}if(qtCat!=='all'&&!QCATL[qtCat])qtCat='all';
   /* Onglet Quêtes : la quête principale mise en avant (avec Kimchi), puis les quêtes secondaires */
   var qtDone=false;
+  var qPrivacyT=null;
+  function qPrivacyNotice(on){var el=$('q-privacy-note');if(!el)return;clearTimeout(qPrivacyT);el.className='qprivacy-note'+(on?' private':'');el.textContent=on?'👻 Cette quête sera visible seulement par toi.':'🏠 Cette quête sera visible par '+(PEOPLE.p1||'Pierre')+' et '+(PEOPLE.p2||'Justine')+'.';el.hidden=false;qPrivacyT=setTimeout(function(){el.hidden=true},2600)}
+  function setNewQuestPrivacy(on,announce){var b=$('q-private');if(!b)return;b.setAttribute('aria-pressed',String(on));b.setAttribute('aria-label',on?'Rendre la quête visible par tout le foyer':'Rendre la quête visible seulement par moi');b.title=on?'Quête privée : toucher pour la partager':'Quête partagée : toucher pour la rendre privée';if(announce)qPrivacyNotice(on)}
   function renderQuestScore(){var el=$('q-score');if(!el)return;var a=QUEST_SCORES.p1||0,b=QUEST_SCORES.p2||0,total=a+b,pct=total?Math.round(a/total*100):50;
     el.innerHTML='<div class="qscore-labels"><span><i class="blue"></i>'+esc(PEOPLE.p1||'Pierre')+' <b>'+a+'</b></span><span><b>'+b+'</b> '+esc(PEOPLE.p2||'Justine')+'<i class="pink"></i></span></div><div class="qscore-bar" role="img" aria-label="Quêtes partagées terminées : '+esc(PEOPLE.p1||'Pierre')+' '+a+', '+esc(PEOPLE.p2||'Justine')+' '+b+'"><i class="blue" style="width:'+pct+'%"></i><i class="pink" style="width:'+(100-pct)+'%"></i></div>'}
   function renderQTab(){var L=$('qt-list');if(!L||TAB!=='quetes')return;
@@ -1511,7 +1514,8 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
       else if(S.projects.filter(function(q){return q.main&&q.status!=='done'&&!qIdle(q)}).length>=3){toastMsg('Déjà 3 quêtes principales 📌 — retire-en une pour en épingler une autre');return}
       else upd('projects',id,{main:true});renderSheet()}}
     else if(a==='ppause'){it=find('projects',id);if(it){upd('projects',id,{paused:it.paused?null:true});renderSheet()}}
-    else if(a==='qprivate'){it=find('projects',id);if(it&&(it.createdBy===KEY||!it.createdBy)){upd('projects',id,{visibility:it.visibility==='private'?'household':'private'});renderSheet()}}
+    else if(a==='qprivate-new'){setNewQuestPrivacy(b.getAttribute('aria-pressed')!=='true',true)}
+    else if(a==='qprivate'){it=find('projects',id);if(it&&(it.createdBy===KEY||!it.createdBy)){var makePrivate=it.visibility!=='private';upd('projects',id,{visibility:makePrivate?'private':'household'});qPrivacyNotice(makePrivate);renderSheet()}}
     else if(a==='main-finish'){updUndo('projects',id,{main:false,status:'done'},'Quête accomplie 🎉')}
     else if(a==='ppick'){iconOpen=false;upd('projects',id,{emoji:b.getAttribute('data-e'),autoIcon:false});renderSheet()}
     else if(a==='icon-toggle'){iconOpen=!iconOpen;renderSheet()}
@@ -1598,7 +1602,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     else if(a==='ag-hid'){setHid([]);renderAgenda()}
     else if(a==='qt-done'){qtDone=!qtDone;renderQTab()}
     else if(a==='qt-cat'){qtCat=b.getAttribute('data-v');if(qtCat!=='all'&&!QCATL[qtCat])qtCat='all';try{localStorage.setItem('maison-qcat',qtCat)}catch(e){}renderQTab()}
-    else if(a==='qadd3-toggle'){var q3=$('f-qadd3');q3.hidden=!q3.hidden;if(!q3.hidden)$('q-title3').focus()}
+    else if(a==='qadd3-toggle'){var q3=$('f-qadd3');q3.hidden=!q3.hidden;if(!q3.hidden){setNewQuestPrivacy(false,false);$('q-title3').focus()}}
     else if(a==='add-toggle'){var fa=$('f-add');fa.hidden=!fa.hidden;if(!fa.hidden)$('a-title').focus()}
     else if(a==='sd'){it=find('projects',id);if(it){var i2=Number(b.getAttribute('data-i'));var st2=steps(it);st2.splice(i2,1);upd('projects',id,{steps:st2})}}
     else if(a==='cal-go'){load()}
@@ -1652,7 +1656,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
       pi.value='';setPack(pt.id,cur.concat([{t:pv,done:false}]));
       var pi2=document.querySelector('#vv-body [data-packinput]');if(pi2)pi2.focus();return;
     }
-    if(f.id==='f-qadd3'){var q3t=$('q-title3'),q3s=splitEmoji(q3t.value);if(!q3s.title&&!q3s.emoji)return;var np=newProj(q3s),qpriv=$('q-private');if(QCATL[qtCat])np.cat=qtCat;if(qpriv&&qpriv.checked)np.visibility='private';addDoc('projects',np);q3t.value='';if(qpriv)qpriv.checked=false;f.hidden=true;return}
+    if(f.id==='f-qadd3'){var q3t=$('q-title3'),q3s=splitEmoji(q3t.value);if(!q3s.title&&!q3s.emoji)return;var np=newProj(q3s),qpriv=$('q-private');if(QCATL[qtCat])np.cat=qtCat;if(qpriv&&qpriv.getAttribute('aria-pressed')==='true')np.visibility='private';addDoc('projects',np);q3t.value='';setNewQuestPrivacy(false,false);f.hidden=true;return}
     if(f.id==='f-add'){
       var ti=$('a-title'),sp0=splitEmoji(ti.value);if(!sp0.title&&!sp0.emoji)return;
       addDoc('projects',newProj(sp0));
