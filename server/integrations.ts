@@ -31,6 +31,26 @@ type GoogleEvent = {
 }
 type CalendarPage = { summary?: string; nextPageToken?: string; items?: GoogleEvent[] }
 
+function calendarIds(env: NodeJS.ProcessEnv) {
+  return [...new Set((env.CALENDAR_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean))]
+}
+
+async function googleAccessToken(env: NodeJS.ProcessEnv) {
+  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN } = env
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) throw new Error('Google Calendar OAuth is incomplete')
+  return cached(googleToken, 1_500_000, async () => {
+    const data = await json<{ access_token?: string }>('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      body: new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
+        refresh_token: GOOGLE_REFRESH_TOKEN, grant_type: 'refresh_token',
+      }),
+    })
+    if (!data.access_token) throw new Error('Google returned no access token')
+    return data.access_token
+  })
+}
+
 function label(summary: string, index: number) {
   const value = summary.trim()
     .replace(/^(?:(?:mon|ma|mes|le|la|les|my|the)\s+)?(?:agenda|calendrier|calendar)\b\s*[:–—-]?\s*(?:(?:de|du|des)\s+|d['’])?/i, '')
@@ -53,22 +73,10 @@ async function readCalendar(id: string, index: number, token: string, timeMin: s
 }
 
 export async function agenda(env: NodeJS.ProcessEnv) {
-  const ids = [...new Set((env.CALENDAR_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean))]
+  const ids = calendarIds(env)
   if (ids.length === 0) return { events: [], calendars: [] }
   return cached(calendarCache, 300_000, async () => {
-    const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN } = env
-    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) throw new Error('Google Calendar OAuth is incomplete')
-    const token = await cached(googleToken, 1_500_000, async () => {
-      const data = await json<{ access_token?: string }>('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        body: new URLSearchParams({
-          client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
-          refresh_token: GOOGLE_REFRESH_TOKEN, grant_type: 'refresh_token',
-        }),
-      })
-      if (!data.access_token) throw new Error('Google returned no access token')
-      return data.access_token
-    })
+    const token = await googleAccessToken(env)
     const now = new Date()
     const results = await Promise.allSettled(ids.map((id, i) => readCalendar(id, i, token, now.toISOString(), new Date(now.getTime() + 35 * 864e5).toISOString())))
     const events = new Map<string, CalendarEvent>()
@@ -110,21 +118,9 @@ function parisDate(dateTime: string) {
 }
 
 export async function searchAgenda(env: NodeJS.ProcessEnv, from: string, to: string) {
-  const ids = [...new Set((env.CALENDAR_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean))]
+  const ids = calendarIds(env)
   if (ids.length === 0) return { events: [], calendars: [] }
-  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN } = env
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) throw new Error('Google Calendar OAuth is incomplete')
-  const token = await cached(googleToken, 1_500_000, async () => {
-    const data = await json<{ access_token?: string }>('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      body: new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
-        refresh_token: GOOGLE_REFRESH_TOKEN, grant_type: 'refresh_token',
-      }),
-    })
-    if (!data.access_token) throw new Error('Google returned no access token')
-    return data.access_token
-  })
+  const token = await googleAccessToken(env)
   const after = new Date(Date.parse(to + 'T00:00:00Z') + 2 * 864e5).toISOString()
   const before = new Date(Date.parse(from + 'T00:00:00Z') - 864e5).toISOString()
   const results = await Promise.allSettled(ids.map((id, i) => readCalendar(id, i, token, before, after, '250')))
@@ -157,6 +153,24 @@ export async function searchAgenda(env: NodeJS.ProcessEnv, from: string, to: str
   if (!calendars.length) throw new Error('No configured Google calendar is accessible')
   const sortKey = (event: CalendarEvent) => 'date' in event.start ? event.start.date : event.start.dateTime
   return { calendars, events: [...events.values()].sort((a, b) => sortKey(a).localeCompare(sortKey(b))) }
+}
+
+export async function createAgendaEvent(env: NodeJS.ProcessEnv, calendarId: string, title: string, start: string, end: string) {
+  const rawId = calendarIds(env).find(id => hash(id) === calendarId)
+  if (!rawId) throw new Error('Unknown configured Google calendar')
+  const token = await googleAccessToken(env)
+  const url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(rawId) + '/events'
+  const event = await json<GoogleEvent>(url, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      summary: title,
+      start: { dateTime: start + ':00', timeZone: 'Europe/Paris' },
+      end: { dateTime: end + ':00', timeZone: 'Europe/Paris' },
+    }),
+  })
+  calendarCache.until = 0
+  return { id: hash(event.id + '|' + start) }
 }
 
 type Forecast = {

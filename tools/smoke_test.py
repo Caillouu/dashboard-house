@@ -145,6 +145,14 @@ def main():
                     page.screenshot(path=f'{OUT}/{name}-agenda.png')
                     txt = page.inner_text('#agtab').lower()
                     assert 'cette semaine' in txt and 'semaine prochaine' in txt and "semaine d'après" in txt and 'lun.' in txt, 'agenda par semaines'
+                    page.click('[data-act="ag-create-toggle"]'); page.wait_for_timeout(150)
+                    assert page.is_visible('#ag-create-form') and not page.is_visible('.ag-list'), 'ajout agenda en vue dédiée'
+                    assert page.locator('#ag-create-form [name="calendarId"]').count() == 1, 'choix du Google Agenda'
+                    assert page.locator('#ag-create-form [name="startHour"] option').count() == 24, 'heures de début'
+                    assert page.locator('#ag-create-form [name="endMinute"] option').count() == 12, 'minutes de fin'
+                    page.fill('#ag-create-form [name="title"]', 'Dentiste')
+                    page.click('#ag-create-form [type="submit"]'); page.wait_for_timeout(250)
+                    assert not page.is_visible('#ag-create-form'), 'fermeture après ajout agenda'
                     page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(300)
                     page.click('.head .calb'); page.wait_for_timeout(300)
                     assert page.get_attribute('body', 'data-tab') == 'agenda', 'bouton agenda en haut'

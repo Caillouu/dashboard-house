@@ -43,12 +43,12 @@ npm run build
 
 Voir [la configuration Git de Vercel](https://vercel.com/docs/git) et [l’intégration Vercel de Turso](https://vercel.com/marketplace/tursocloud/database).
 
-## Google Agenda en lecture seule
+## Google Agenda en lecture et écriture
 
-L’agenda est facultatif. Dans Google Cloud, active l’API Google Calendar et configure un client OAuth pour le compte Google dédié au foyer. Partage chaque agenda avec ce compte en lecture seule.
+L’agenda est facultatif. Dans Google Cloud, active l’API Google Calendar et configure un client OAuth pour le compte Google dédié au foyer. Partage chaque agenda avec ce compte en autorisant la modification des événements.
 
 1. Crée un client OAuth de type **Application Web** et ajoute `https://developers.google.com/oauthplayground` à ses URI de redirection autorisés.
-2. Dans [OAuth 2.0 Playground](https://developers.google.com/oauthplayground), ouvre les paramètres, coche **Use your own OAuth credentials**, puis renseigne le client Google Cloud créé ci-dessus. Autorise uniquement le scope `https://www.googleapis.com/auth/calendar.readonly` avec le compte dédié et échange le code contre un jeton. Conserve le jeton de renouvellement. Pour un fonctionnement durable, vérifie l’état de publication de l’application OAuth. En mode **Testing**, un jeton externe avec ce scope expire au bout de sept jours.
+2. Dans [OAuth 2.0 Playground](https://developers.google.com/oauthplayground), ouvre les paramètres, coche **Use your own OAuth credentials**, puis renseigne le client Google Cloud créé ci-dessus. Autorise le scope `https://www.googleapis.com/auth/calendar.events` avec le compte dédié et échange le code contre un jeton. Conserve le jeton de renouvellement. Pour un fonctionnement durable, vérifie l’état de publication de l’application OAuth. En mode **Testing**, un jeton externe avec ce scope expire au bout de sept jours.
 3. Dans Vercel, ajoute `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` et `CALENDAR_IDS`. Sépare les identifiants des agendas par des virgules. Redéploie le projet. Vérifie l’onglet Agenda et les filtres, puis les logs Vercel si un agenda manque.
 
 Voir [la documentation Google sur les jetons de renouvellement](https://developers.google.com/identity/protocols/oauth2#expiration).
