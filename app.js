@@ -617,6 +617,7 @@ import { isDisplayableRecord } from './src/records.ts'
   /* ---- Onglet Agenda : ce qui va se passer dans les prochains jours et semaines ---- */
   var agSel=null,agHidden=new Set(),agSearchSeq=0;
   var agSearch={open:false,month:new Date(new Date().getFullYear(),new Date().getMonth(),1),from:'',to:'',status:'idle',events:[],calendars:[]};
+  var agCreate={open:false,status:'idle',error:''};
   function agTone(name){var n=nrm(name);return n.indexOf('jupiter')>=0?'jupiter':n.indexOf('pierre')>=0?'pierre':n.indexOf('perso')>=0?'perso':'other'}
   function agSearchLabel(){
     if(!agSearch.from)return 'Choisis une date ou une période';
@@ -647,6 +648,24 @@ import { isDisplayableRecord } from './src/records.ts'
     agSearch.status='loading';agSearch.events=[];renderAgenda();
     api('agendaSearch',{from:agSearch.from,to:agSearch.to||agSearch.from}).then(function(result){if(seq!==agSearchSeq)return;agSearch.status='done';agSearch.events=result.events||[];agSearch.calendars=result.calendars||[];renderAgenda()}).catch(function(error){if(seq!==agSearchSeq)return;if(authFail(error))return;agSearch.status='error';renderAgenda()});
   }
+  function agTimeSelect(name,value,label){
+    var hours='',minutes='';
+    for(var h=0;h<24;h++)hours+='<option value="'+pad(h)+'"'+(pad(h)===value.slice(0,2)?' selected':'')+'>'+pad(h)+'</option>';
+    for(var m=0;m<60;m+=5)minutes+='<option value="'+pad(m)+'"'+(pad(m)===value.slice(3)?' selected':'')+'>'+pad(m)+'</option>';
+    return '<fieldset class="ag-create-time"><legend>'+label+'</legend><label><span>Heure</span><select name="'+name+'Hour">'+hours+'</select></label><span aria-hidden="true">:</span><label><span>Minute</span><select name="'+name+'Minute">'+minutes+'</select></label></fieldset>';
+  }
+  function agCreatePanel(){
+    if(!agCreate.open)return '';
+    var now=new Date();now.setSeconds(0,0);now.setMinutes(Math.ceil(now.getMinutes()/5)*5);var later=new Date(now.getTime()+36e5),today=iso(now),endDay=iso(later),startTime=pad(now.getHours())+':'+pad(now.getMinutes()),endTime=pad(later.getHours())+':'+pad(later.getMinutes());
+    var choices=(cal.calendars||[]).map(function(c,i){return '<label class="ag-create-calendar ag-tone-'+agTone(c.name)+'"><input type="radio" name="calendarId" value="'+esc(c.id)+'"'+(i===0?' checked':'')+'><span>'+esc(c.name)+'</span></label>'}).join('');
+    return '<section class="ag-search-panel ag-create-panel" aria-label="Ajouter un événement"><div class="ag-search-panel-head"><div><b>Ajouter un événement</b><span>Dans le Google Agenda de ton choix</span></div><button type="button" class="ag-search-close" data-act="ag-create-close" aria-label="Fermer l’ajout">×</button></div><form id="ag-create-form" class="ag-create-form">'+
+      '<label class="ag-create-field"><span>Titre de l’événement</span><input name="title" maxlength="120" required autocomplete="off" placeholder="Ex. Rendez-vous vétérinaire"></label>'+
+      '<fieldset class="ag-create-calendars"><legend>Google Agenda</legend><div>'+choices+'</div></fieldset>'+
+      '<div class="ag-create-dates"><label class="ag-create-field"><span>Date de début</span><input type="date" name="startDate" value="'+today+'" required></label><label class="ag-create-field"><span>Date de fin</span><input type="date" name="endDate" value="'+endDay+'" required></label></div>'+
+      '<div class="ag-create-dates">'+agTimeSelect('start',startTime,'Horaire de début')+agTimeSelect('end',endTime,'Horaire de fin')+'</div>'+
+      (agCreate.error?'<p class="ag-create-error" role="alert">'+esc(agCreate.error)+'</p>':'')+
+      '<button type="submit" class="btn ag-search-submit"'+(agCreate.status==='loading'?' disabled':'')+'>'+(agCreate.status==='loading'?'<span class="ag-spinner" aria-hidden="true"></span>Ajout en cours…':'Ajouter l’événement')+'</button></form></section>';
+  }
   function renderAgenda(){var el=$('agtab');if(!el||TAB!=='agenda')return;
     var t0d=t0(),items=[],now=new Date();
     var calendars=cal.calendars||[],focused=document.activeElement,focusId=focused&&el.contains(focused)?focused.getAttribute('data-calendar'):null;
@@ -675,10 +694,11 @@ import { isDisplayableRecord } from './src/records.ts'
         :'<p class="ag-none">'+(cal.status==='ok'?'Rien de prévu 🐾':cal.status==='loading'?'Chargement…':'—')+'</p>')+'</section>'}
     if(cal.status!=='ok'&&cal.status!=='loading')body='<p class="empty">L\'agenda ne répond pas pour le moment.</p>'+body;
     var nHid=cal.status==='ok'?cal.events.filter(function(e){return e&&HID.indexOf(e.id)>=0}).length:0;
-    var searchButton='<div class="ag-tools"><button type="button" class="ag-search-toggle" data-act="ag-search-toggle" aria-expanded="'+agSearch.open+'"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg><span>Rechercher une date</span></button></div>';
+    var searchButton='<div class="ag-tools"><button type="button" class="ag-search-toggle ag-create-toggle" data-act="ag-create-toggle" aria-expanded="'+agCreate.open+'" aria-label="Ajouter un événement"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><button type="button" class="ag-search-toggle" data-act="ag-search-toggle" aria-expanded="'+agSearch.open+'"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg><span>Rechercher une date</span></button></div>';
     /* La recherche est un mode dédié : la chronologie courante ne doit pas concurrencer
        visuellement les résultats de la période choisie. */
     if(agSearch.open){el.innerHTML=searchButton+agSearchPanel();return}
+    if(agCreate.open){el.innerHTML=searchButton+agCreatePanel();return}
     el.innerHTML=searchButton+agSearchPanel()+(filters?'<div class="ag-filters" role="group" aria-label="Agendas synchronisés">'+filters+'</div>':'')+'<div class="ag-list">'+body+'</div>'+(nHid?'<button class="lnk ag-hid" data-act="ag-hid">'+nHid+' événement'+(nHid>1?'s':'')+' masqué'+(nHid>1?'s':'')+' · tout réafficher</button>':'')+
       '<a class="ag-gc" href="https://calendar.google.com/calendar/u/0/r/week" target="_blank" rel="noopener noreferrer">Ouvrir Google Agenda ↗</a>';
     if(focusId!==null)Array.prototype.some.call(el.querySelectorAll('[data-calendar]'),function(button){if(button.getAttribute('data-calendar')!==focusId)return false;button.focus({preventScroll:true});return true});
@@ -1666,8 +1686,10 @@ import { isDisplayableRecord } from './src/records.ts'
     else if(a==='cview-open'){cview(true,true)}
     else if(a==='cview-close'){cview(false,true)}
     else if(a==='qview-open'){setTab('quetes')}
-    else if(a==='ag-search-toggle'){agSearch.open=!agSearch.open;if(agSearch.open&&!agSearch.from)agSearch.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);renderAgenda();if(agSearch.open)setTimeout(function(){var panel=document.querySelector('.ag-search-panel');if(panel)panel.scrollIntoView({block:'nearest',behavior:'smooth'})},0)}
+    else if(a==='ag-search-toggle'){agCreate.open=false;agSearch.open=!agSearch.open;if(agSearch.open&&!agSearch.from)agSearch.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);renderAgenda();if(agSearch.open)setTimeout(function(){var panel=document.querySelector('.ag-search-panel');if(panel)panel.scrollIntoView({block:'nearest',behavior:'smooth'})},0)}
     else if(a==='ag-search-close'){agSearch.open=false;renderAgenda()}
+    else if(a==='ag-create-toggle'){agSearch.open=false;agCreate.open=!agCreate.open;agCreate.status='idle';agCreate.error='';renderAgenda();if(agCreate.open)setTimeout(function(){var title=document.querySelector('#ag-create-form [name="title"]');if(title)title.focus()},0)}
+    else if(a==='ag-create-close'){agCreate.open=false;renderAgenda()}
     else if(a==='ag-search-prev'){agSearch.month=new Date(agSearch.month.getFullYear(),agSearch.month.getMonth()-1,1);renderAgenda()}
     else if(a==='ag-search-next'){agSearch.month=new Date(agSearch.month.getFullYear(),agSearch.month.getMonth()+1,1);renderAgenda()}
     else if(a==='ag-search-pick'){var sd=b.getAttribute('data-date');if(!agSearch.from||agSearch.to||sd<agSearch.from){agSearch.from=sd;agSearch.to=''}else if(sd>agSearch.from)agSearch.to=sd;else agSearch.to='';agSearch.status='idle';agSearch.events=[];renderAgenda()}
@@ -1705,6 +1727,13 @@ import { isDisplayableRecord } from './src/records.ts'
   document.addEventListener('submit',function(){setTimeout(syncPlus,0)});
   document.addEventListener('submit',function(e){
     var f=e.target;if(f.id==='login-form')return;e.preventDefault();
+    if(f.id==='ag-create-form'){
+      var data=new FormData(f),start=String(data.get('startDate'))+'T'+String(data.get('startHour'))+':'+String(data.get('startMinute')),end=String(data.get('endDate'))+'T'+String(data.get('endHour'))+':'+String(data.get('endMinute')),title=String(data.get('title')||'').trim(),calendarId=String(data.get('calendarId')||'');
+      if(!title||!calendarId)return;
+      if(start>=end){var endDate=f.querySelector('[name="endDate"]');endDate.setCustomValidity('La fin doit être après le début.');endDate.reportValidity();endDate.addEventListener('input',function(){endDate.setCustomValidity('')},{once:true});return}
+      agCreate.status='loading';agCreate.error='';renderAgenda();
+      api('agendaCreate',{calendarId:calendarId,title:title,start:start,end:end}).then(function(){agCreate.open=false;agCreate.status='idle';toastMsg('Événement ajouté dans Google Agenda ✓');refreshIntegrations(true);renderAgenda()}).catch(function(error){if(authFail(error))return;agCreate.status='idle';agCreate.error='L’événement n’a pas pu être ajouté. Vérifie les droits Google Agenda puis réessaie.';renderAgenda()});return;
+    }
     if(f.classList&&f.classList.contains('care-add')){
       var ci=f.querySelector('input'),sp=splitEmoji(ci.value);
       if(!sp.title&&!sp.emoji)return;

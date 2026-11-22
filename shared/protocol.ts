@@ -37,6 +37,13 @@ export const request = z.union([
     to: z.iso.date(),
   }).refine(value => value.from <= value.to &&
     (Date.parse(value.to + 'T00:00:00Z') - Date.parse(value.from + 'T00:00:00Z')) / 864e5 <= 366),
+  z.object({
+    a: z.literal('agendaCreate'),
+    calendarId: id,
+    title: z.string().trim().min(1).max(120),
+    start: z.string().regex(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/),
+    end: z.string().regex(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/),
+  }).refine(value => value.start < value.end),
   charlieRecommendations,
   mutation,
 ])

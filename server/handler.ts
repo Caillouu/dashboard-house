@@ -1,7 +1,7 @@
 import type { Client } from '@libsql/client'
 import { request } from '../shared/protocol.ts'
 import { charlieSkillAuthorized, clearSession, login, user } from './auth.ts'
-import { agenda, searchAgenda, weather } from './integrations.ts'
+import { agenda, createAgendaEvent, searchAgenda, weather } from './integrations.ts'
 import { addCharlieRecommendations, applyMutation, snapshot } from './store.ts'
 
 function reply(value: unknown, status = 200, cookie?: string) {
@@ -39,6 +39,7 @@ export async function dashboard(req: Request, getDb: () => Client, env: NodeJS.P
       case 'load': return reply({ ok: true, member, ...await snapshot(getDb(), env, member) })
       case 'agenda': return reply({ ok: true, ...await agenda(env) })
       case 'agendaSearch': return reply({ ok: true, ...await searchAgenda(env, op.from, op.to) })
+      case 'agendaCreate': return reply({ ok: true, ...await createAgendaEvent(env, op.calendarId, op.title, op.start, op.end) })
       case 'weather': return reply({ ok: true, weather: await weather(env) })
       case 'put':
       case 'del':
