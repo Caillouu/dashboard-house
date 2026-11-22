@@ -87,6 +87,14 @@ curl https://dashboard.example/api/dashboard \
 
 Le skill doit conserver ce secret côté serveur et ne jamais l’inclure dans un lien, un mail ou du code client. Après ajout ou modification de la variable dans Vercel, il faut redéployer pour qu’elle soit disponible à la fonction.
 
+## Skill mensuel de quittance de loyer
+
+Le skill de quittance utilise le même secret serveur et le même point d’entrée. Avant de générer le PDF, il envoie `{"a":"rentReceiptStatus","month":"YYYY-MM","status":"not-generated"}`. Le dashboard crée ou rafraîchit alors l’unique routine **Justine** « Quittance de loyer (non généré) », à échéance du premier jour du mois.
+
+Après confirmation de l’envoi réel de l’e-mail, le skill envoie le même corps avec `"status":"generated"`. La routine devient « Quittance de loyer (généré) » et est marquée comme terminée. Si la génération ou l’envoi échoue, le second appel ne doit pas être effectué : la mention « non généré » reste ainsi visible.
+
+Ces appels sont rejouables et mettent à jour la même routine `rent-receipt`, sans doublon. Le mois doit être au format `YYYY-MM` et l’en-tête d’autorisation reste `Authorization: Bearer <CHARLIE_SKILL_SECRET>`.
+
 ## Hors ligne et conflits
 
 Ouvre la PWA une première fois en ligne et connecte-toi. Le service worker précharge le build. L’application conserve aussi le dernier état du foyer sur l’appareil. Les changements effectués hors ligne restent en file après fermeture ou rechargement de l’app. La synchro reprend à la reconnexion tant que l’app est ouverte, ou à sa prochaine ouverture.

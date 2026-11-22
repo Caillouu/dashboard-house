@@ -223,3 +223,52 @@ test('Charlie monthly recommendations are authenticated, dated, and idempotent',
     db.close()
   }
 })
+
+test('rent receipt skill keeps one Justine routine and advances its generation status', async () => {
+  const db = createClient({ url: 'file::memory:' })
+  try {
+    await migrate(db)
+    const env = { CHARLIE_SKILL_SECRET: 'shared-skill-secret-that-is-long-enough' }
+    const call = (status: 'not-generated' | 'generated', authorization?: string) => dashboard(new Request('https://house.test/api/dashboard', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authorization ? { Authorization: authorization } : {}),
+      },
+      body: JSON.stringify({ a: 'rentReceiptStatus', month: '2026-12', status }),
+    }), () => db, env)
+
+    assert.equal((await call('not-generated')).status, 401)
+    const pending = await call('not-generated', 'Bearer ' + env.CHARLIE_SKILL_SECRET)
+    assert.deepEqual(await pending.json(), { ok: true, updated: true, status: 'not-generated', month: '2026-12' })
+
+    let { rows } = await db.execute("SELECT data, revision FROM records WHERE collection = 'routines' AND id = 'rent-receipt'")
+    let routine = JSON.parse(String(rows[0].data))
+    assert.equal(routine[1], 'Justine')
+    assert.equal(routine[3], 'Quittance de loyer (non généré)')
+    assert.equal(routine[4], '')
+    assert.deepEqual(JSON.parse(routine[7]), {
+      source: 'rent-receipt-monthly-skill',
+      month: '2026-12',
+      dueDate: '2026-12-01',
+      snoozeUntil: '2026-12-01',
+      forceColor: 'o',
+      customText: 'À envoyer le 01/12/2026',
+    })
+
+    await call('generated', 'Bearer ' + env.CHARLIE_SKILL_SECRET)
+    ;({ rows } = await db.execute("SELECT data, revision FROM records WHERE collection = 'routines' AND id = 'rent-receipt'"))
+    routine = JSON.parse(String(rows[0].data))
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0].revision, 2)
+    assert.equal(routine[3], 'Quittance de loyer (généré)')
+    assert.equal(routine[4], '2026-12-01')
+    assert.deepEqual(JSON.parse(routine[7]), {
+      source: 'rent-receipt-monthly-skill',
+      month: '2026-12',
+      dueDate: '2026-12-01',
+    })
+  } finally {
+    db.close()
+  }
+})

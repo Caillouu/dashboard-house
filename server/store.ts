@@ -177,3 +177,37 @@ export async function addCharlieRecommendations(db: Client, appointments: Charli
   const created = results.reduce((total, result) => total + result.rowsAffected, 0)
   return { created, existing: appointments.length - created }
 }
+
+type RentReceiptStatus = Extract<DashboardRequest, { a: 'rentReceiptStatus' }>
+
+export async function setRentReceiptStatus(db: Client, month: RentReceiptStatus['month'], status: RentReceiptStatus['status']) {
+  const dueDate = month + '-01'
+  const generated = status === 'generated'
+  const metadata = {
+    source: 'rent-receipt-monthly-skill',
+    month,
+    dueDate,
+    ...(generated ? {} : {
+      snoozeUntil: dueDate,
+      forceColor: 'o',
+      customText: `À envoyer le 01/${month.slice(5)}/${month.slice(0, 4)}`,
+    }),
+  }
+  const row = [
+    'rent-receipt',
+    'Justine',
+    '🧾',
+    `Quittance de loyer (${generated ? 'généré' : 'non généré'})`,
+    generated ? dueDate : '',
+    '',
+    'jours',
+    JSON.stringify(metadata),
+  ]
+  const result = await db.execute({
+    sql: `INSERT INTO records (collection, id, data, revision)
+      VALUES ('routines', 'rent-receipt', ?, 1)
+      ON CONFLICT(collection, id) DO UPDATE SET data = excluded.data, revision = records.revision + 1`,
+    args: [JSON.stringify(row)],
+  })
+  return { updated: result.rowsAffected === 1, status, month }
+}

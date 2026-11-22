@@ -2,7 +2,7 @@ import type { Client } from '@libsql/client'
 import { request } from '../shared/protocol.ts'
 import { charlieSkillAuthorized, clearSession, login, user } from './auth.ts'
 import { agenda, createAgendaEvent, searchAgenda, weather } from './integrations.ts'
-import { addCharlieRecommendations, applyMutation, snapshot } from './store.ts'
+import { addCharlieRecommendations, applyMutation, setRentReceiptStatus, snapshot } from './store.ts'
 
 function reply(value: unknown, status = 200, cookie?: string) {
   const headers = new Headers({ 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' })
@@ -26,6 +26,10 @@ export async function dashboard(req: Request, getDb: () => Client, env: NodeJS.P
     if (op.a === 'charlieRecommendations') {
       if (!charlieSkillAuthorized(req, env)) return reply({ ok: false, error: 'auth' }, 401)
       return reply({ ok: true, ...await addCharlieRecommendations(getDb(), op.appointments) })
+    }
+    if (op.a === 'rentReceiptStatus') {
+      if (!charlieSkillAuthorized(req, env)) return reply({ ok: false, error: 'auth' }, 401)
+      return reply({ ok: true, ...await setRentReceiptStatus(getDb(), op.month, op.status) })
     }
     if (op.a === 'login') {
       const result = await login(req, getDb(), op.member, op.code, env)

@@ -28,6 +28,11 @@ const charlieRecommendations = z.object({
     dueDate: z.iso.date(),
   })).min(1).max(50),
 })
+const rentReceiptStatus = z.object({
+  a: z.literal('rentReceiptStatus'),
+  month: z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/),
+  status: z.enum(['not-generated', 'generated']),
+})
 export const request = z.union([
   z.object({ a: z.literal('login'), member: z.enum(['p1', 'p2']), code: z.string().min(1).max(200) }),
   z.object({ a: z.enum(['load', 'logout', 'agenda', 'weather']) }),
@@ -45,6 +50,7 @@ export const request = z.union([
     end: z.string().regex(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/),
   }).refine(value => value.start < value.end),
   charlieRecommendations,
+  rentReceiptStatus,
   mutation,
 ])
 export type Mutation = z.infer<typeof mutation>
