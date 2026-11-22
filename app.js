@@ -615,8 +615,38 @@ import { isDisplayableRecord } from './src/records.ts'
     h+='<button class="viewbot" type="button" data-act="view-toggle">Passer à la vue détaillée</button>';
     el.innerHTML=h}
   /* ---- Onglet Agenda : ce qui va se passer dans les prochains jours et semaines ---- */
-  var agSel=null,agHidden=new Set();
+  var agSel=null,agHidden=new Set(),agSearchSeq=0;
+  var agSearch={open:false,month:new Date(new Date().getFullYear(),new Date().getMonth(),1),from:'',to:'',status:'idle',events:[],calendars:[]};
   function agTone(name){var n=nrm(name);return n.indexOf('jupiter')>=0?'jupiter':n.indexOf('pierre')>=0?'pierre':n.indexOf('perso')>=0?'perso':'other'}
+  function agSearchLabel(){
+    if(!agSearch.from)return 'Choisis une date ou une période';
+    var a=fmtDay(agSearch.from,{day:'numeric',month:'long',year:'numeric'});
+    return agSearch.to?a+' → '+fmtDay(agSearch.to,{day:'numeric',month:'long',year:'numeric'}):a;
+  }
+  function agSearchResults(){
+    if(agSearch.status==='loading')return '<div class="ag-search-state" role="status"><span class="ag-spinner" aria-hidden="true"></span><b>Recherche dans les agendas…</b></div>';
+    if(agSearch.status==='error')return '<div class="ag-search-state error" role="alert"><b>La recherche n’a pas abouti.</b><span>Vérifie la connexion puis réessaie.</span></div>';
+    if(agSearch.status!=='done')return '';
+    if(!agSearch.events.length)return '<div class="ag-search-state empty" role="status"><span aria-hidden="true">✓</span><b>Aucun événement prévu encore '+(agSearch.to?'sur ces dates.':'à cette date.')+'</b></div>';
+    var names=new Map((agSearch.calendars||[]).map(function(c){return [c.id,c.name]}));
+    var groups=new Map();
+    agSearch.events.forEach(function(event){var info=evInfo(event);if(!info)return;var key=iso(info.d),list=groups.get(key)||[];list.push({event:event,info:info});groups.set(key,list)});
+    var rows='';groups.forEach(function(list,date){rows+='<section class="ag-search-day"><h4>'+esc(cap(parse(date).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})))+'</h4>'+list.map(function(x){
+      var calendarNames=(x.event.calendars||[]).map(function(id){return names.get(id)}).filter(Boolean),calendar=calendarNames.join(' · ');
+      return '<article class="ag-search-event ag-tone-'+agTone(calendarNames[0]||'')+'"><span class="ag-search-time">'+(x.info.allDay?'Journée':esc(x.info.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})))+'</span><span><b>'+esc(eventTitle(x.event,'Sans titre'))+'</b>'+(calendar?'<small>'+esc(calendar)+'</small>':'')+'</span></article>'}).join('')+'</section>'});
+    return '<div class="ag-search-results" role="status"><div class="ag-search-count">'+agSearch.events.length+' événement'+(agSearch.events.length>1?'s':'')+' trouvé'+(agSearch.events.length>1?'s':'')+'</div>'+rows+'</div>';
+  }
+  function agSearchPanel(){
+    if(!agSearch.open)return '';
+    var selected=agSearch.from?'<div class="ag-search-choice"><span>'+esc(agSearchLabel())+'</span><button type="button" data-act="ag-search-clear" aria-label="Effacer les dates">×</button></div>':'<p class="ag-search-help">Choisis un jour, ou touche un second jour pour définir une période.</p>';
+    return '<section class="ag-search-panel" aria-label="Rechercher des événements"><div class="ag-search-panel-head"><div><b>Rechercher une date</b><span>Dans tous les Google Agendas</span></div><button type="button" class="ag-search-close" data-act="ag-search-close" aria-label="Fermer la recherche">×</button></div>'+rangeCal(agSearch.from,agSearch.to,agSearch.month,'ag-search','')+selected+
+      '<button type="button" class="btn ag-search-submit" data-act="ag-search-run"'+(!agSearch.from||agSearch.status==='loading'?' disabled':'')+'><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg>Rechercher</button>'+agSearchResults()+'</section>';
+  }
+  function runAgendaSearch(){
+    if(!agSearch.from)return;var seq=++agSearchSeq;
+    agSearch.status='loading';agSearch.events=[];renderAgenda();
+    api('agendaSearch',{from:agSearch.from,to:agSearch.to||agSearch.from}).then(function(result){if(seq!==agSearchSeq)return;agSearch.status='done';agSearch.events=result.events||[];agSearch.calendars=result.calendars||[];renderAgenda()}).catch(function(error){if(seq!==agSearchSeq)return;if(authFail(error))return;agSearch.status='error';renderAgenda()});
+  }
   function renderAgenda(){var el=$('agtab');if(!el||TAB!=='agenda')return;
     var t0d=t0(),items=[],now=new Date();
     var calendars=cal.calendars||[],focused=document.activeElement,focusId=focused&&el.contains(focused)?focused.getAttribute('data-calendar'):null;
@@ -645,7 +675,8 @@ import { isDisplayableRecord } from './src/records.ts'
         :'<p class="ag-none">'+(cal.status==='ok'?'Rien de prévu 🐾':cal.status==='loading'?'Chargement…':'—')+'</p>')+'</section>'}
     if(cal.status!=='ok'&&cal.status!=='loading')body='<p class="empty">L\'agenda ne répond pas pour le moment.</p>'+body;
     var nHid=cal.status==='ok'?cal.events.filter(function(e){return e&&HID.indexOf(e.id)>=0}).length:0;
-    el.innerHTML=(filters?'<div class="ag-filters" role="group" aria-label="Agendas synchronisés">'+filters+'</div>':'')+'<div class="ag-list">'+body+'</div>'+(nHid?'<button class="lnk ag-hid" data-act="ag-hid">'+nHid+' événement'+(nHid>1?'s':'')+' masqué'+(nHid>1?'s':'')+' · tout réafficher</button>':'')+
+    var searchButton='<div class="ag-tools"><button type="button" class="ag-search-toggle" data-act="ag-search-toggle" aria-expanded="'+agSearch.open+'"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg><span>Rechercher une date</span></button></div>';
+    el.innerHTML=searchButton+agSearchPanel()+(filters?'<div class="ag-filters" role="group" aria-label="Agendas synchronisés">'+filters+'</div>':'')+'<div class="ag-list">'+body+'</div>'+(nHid?'<button class="lnk ag-hid" data-act="ag-hid">'+nHid+' événement'+(nHid>1?'s':'')+' masqué'+(nHid>1?'s':'')+' · tout réafficher</button>':'')+
       '<a class="ag-gc" href="https://calendar.google.com/calendar/u/0/r/week" target="_blank" rel="noopener noreferrer">Ouvrir Google Agenda ↗</a>';
     if(focusId!==null)Array.prototype.some.call(el.querySelectorAll('[data-calendar]'),function(button){if(button.getAttribute('data-calendar')!==focusId)return false;button.focus({preventScroll:true});return true});
   }
@@ -1632,6 +1663,13 @@ import { isDisplayableRecord } from './src/records.ts'
     else if(a==='cview-open'){cview(true,true)}
     else if(a==='cview-close'){cview(false,true)}
     else if(a==='qview-open'){setTab('quetes')}
+    else if(a==='ag-search-toggle'){agSearch.open=!agSearch.open;if(agSearch.open&&!agSearch.from)agSearch.month=new Date(new Date().getFullYear(),new Date().getMonth(),1);renderAgenda();if(agSearch.open)setTimeout(function(){var panel=document.querySelector('.ag-search-panel');if(panel)panel.scrollIntoView({block:'nearest',behavior:'smooth'})},0)}
+    else if(a==='ag-search-close'){agSearch.open=false;renderAgenda()}
+    else if(a==='ag-search-prev'){agSearch.month=new Date(agSearch.month.getFullYear(),agSearch.month.getMonth()-1,1);renderAgenda()}
+    else if(a==='ag-search-next'){agSearch.month=new Date(agSearch.month.getFullYear(),agSearch.month.getMonth()+1,1);renderAgenda()}
+    else if(a==='ag-search-pick'){var sd=b.getAttribute('data-date');if(!agSearch.from||agSearch.to||sd<agSearch.from){agSearch.from=sd;agSearch.to=''}else if(sd>agSearch.from)agSearch.to=sd;else agSearch.to='';agSearch.status='idle';agSearch.events=[];renderAgenda()}
+    else if(a==='ag-search-clear'){agSearch.from='';agSearch.to='';agSearch.status='idle';agSearch.events=[];renderAgenda()}
+    else if(a==='ag-search-run'){runAgendaSearch()}
     else if(a==='ag-day'){var nd=Number(b.getAttribute('data-v'));agSel=nd;renderAgenda();var g=document.getElementById('ag-d'+nd);if(g)g.scrollIntoView({block:'start',behavior:'smooth'});else toastMsg('Rien de prévu ce jour-là')}
     else if(a==='ag-filter'){var calendarId=b.getAttribute('data-calendar');if(agHidden.has(calendarId))agHidden.delete(calendarId);else agHidden.add(calendarId);renderAgenda()}
     else if(a==='ag-hid'){setHid([]);renderAgenda()}

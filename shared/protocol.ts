@@ -31,6 +31,12 @@ const charlieRecommendations = z.object({
 export const request = z.union([
   z.object({ a: z.literal('login'), member: z.enum(['p1', 'p2']), code: z.string().min(1).max(200) }),
   z.object({ a: z.enum(['load', 'logout', 'agenda', 'weather']) }),
+  z.object({
+    a: z.literal('agendaSearch'),
+    from: z.iso.date(),
+    to: z.iso.date(),
+  }).refine(value => value.from <= value.to &&
+    (Date.parse(value.to + 'T00:00:00Z') - Date.parse(value.from + 'T00:00:00Z')) / 864e5 <= 366),
   charlieRecommendations,
   mutation,
 ])

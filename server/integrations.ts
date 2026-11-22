@@ -40,11 +40,11 @@ function label(summary: string, index: number) {
   return value ? (value[0].toUpperCase() + value.slice(1)).slice(0, 60) : 'Agenda ' + (index + 1)
 }
 
-async function readCalendar(id: string, index: number, token: string, now: Date) {
+async function readCalendar(id: string, index: number, token: string, timeMin: string, timeMax: string, maxResults = '80') {
   const url = new URL('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(id) + '/events')
   url.search = new URLSearchParams({
-    singleEvents: 'true', orderBy: 'startTime', maxResults: '80',
-    timeMin: now.toISOString(), timeMax: new Date(now.getTime() + 35 * 864e5).toISOString(),
+    singleEvents: 'true', orderBy: 'startTime', maxResults,
+    timeMin, timeMax,
     timeZone: 'Europe/Paris',
     fields: 'summary,items(id,iCalUID,summary,status,start)',
   }).toString()
@@ -69,7 +69,8 @@ export async function agenda(env: NodeJS.ProcessEnv) {
       if (!data.access_token) throw new Error('Google returned no access token')
       return data.access_token
     })
-    const results = await Promise.allSettled(ids.map((id, i) => readCalendar(id, i, token, new Date())))
+    const now = new Date()
+    const results = await Promise.allSettled(ids.map((id, i) => readCalendar(id, i, token, now.toISOString(), new Date(now.getTime() + 35 * 864e5).toISOString())))
     const events = new Map<string, CalendarEvent>()
     const calendars: Agenda['calendars'] = []
     for (const result of results) {
@@ -98,6 +99,64 @@ export async function agenda(env: NodeJS.ProcessEnv) {
     const sortKey = (ev: CalendarEvent) => 'date' in ev.start ? ev.start.date : ev.start.dateTime
     return { calendars, events: [...events.values()].sort((a, b) => sortKey(a).localeCompare(sortKey(b))).slice(0, 80) }
   })
+}
+
+function parisDate(dateTime: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(dateTime))
+  const value = Object.fromEntries(parts.map(part => [part.type, part.value]))
+  return value.year + '-' + value.month + '-' + value.day
+}
+
+export async function searchAgenda(env: NodeJS.ProcessEnv, from: string, to: string) {
+  const ids = [...new Set((env.CALENDAR_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean))]
+  if (ids.length === 0) return { events: [], calendars: [] }
+  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN } = env
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) throw new Error('Google Calendar OAuth is incomplete')
+  const token = await cached(googleToken, 1_500_000, async () => {
+    const data = await json<{ access_token?: string }>('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      body: new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
+        refresh_token: GOOGLE_REFRESH_TOKEN, grant_type: 'refresh_token',
+      }),
+    })
+    if (!data.access_token) throw new Error('Google returned no access token')
+    return data.access_token
+  })
+  const after = new Date(Date.parse(to + 'T00:00:00Z') + 2 * 864e5).toISOString()
+  const before = new Date(Date.parse(from + 'T00:00:00Z') - 864e5).toISOString()
+  const results = await Promise.allSettled(ids.map((id, i) => readCalendar(id, i, token, before, after, '250')))
+  const events = new Map<string, CalendarEvent>()
+  const calendars: Agenda['calendars'] = []
+  for (const result of results) {
+    if (result.status !== 'fulfilled') {
+      console.warn('Unable to search a configured Google calendar', result.reason instanceof Error ? result.reason.message : '')
+      continue
+    }
+    const { id, name, items } = result.value
+    calendars.push({ id, name })
+    for (const item of items) {
+      const date = item.start?.date
+      const dateTime = item.start?.dateTime
+      if (!(date || dateTime) || item.status === 'cancelled') continue
+      const localDate = date ?? parisDate(dateTime!)
+      if (localDate < from || localDate > to) continue
+      const start = date ?? new Date(dateTime!).toISOString()
+      const summary = (item.summary ?? '').slice(0, 120)
+      const key = summary + '|' + start
+      const existing = events.get(key)
+      if (existing) {
+        if (!existing.calendars.includes(id)) existing.calendars.push(id)
+      } else {
+        events.set(key, { id: hash((item.iCalUID ?? item.id) + '|' + start), summary, start: date ? { date } : { dateTime: start }, calendars: [id] })
+      }
+    }
+  }
+  if (!calendars.length) throw new Error('No configured Google calendar is accessible')
+  const sortKey = (event: CalendarEvent) => 'date' in event.start ? event.start.date : event.start.dateTime
+  return { calendars, events: [...events.values()].sort((a, b) => sortKey(a).localeCompare(sortKey(b))) }
 }
 
 type Forecast = {
