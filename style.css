@@ -903,9 +903,15 @@ body[data-tab="quetes"] .qtab{display:flex;flex-direction:column;gap:14px;max-wi
 .qscore-bar i{display:block;height:100%;transition:width .25s ease}
 .qadd{flex-wrap:wrap}
 .qadd .in{flex:1 1 230px}
-.qghost{display:flex;align-items:center;gap:6px;min-height:38px;color:var(--ink2);font-size:13px;font-weight:800;cursor:pointer}
-.qghost input{width:18px;height:18px;accent-color:var(--lav)}
+.qghost{display:grid;place-items:center;width:40px;height:40px;padding:0;border:1.5px solid rgba(86,78,112,.18);border-radius:12px;background:rgba(255,255,255,.55);font:inherit;font-size:22px;filter:grayscale(1);opacity:.38;cursor:pointer;transition:filter .16s ease,opacity .16s ease,background .16s ease,border-color .16s ease,transform .16s ease}
+.qghost[aria-pressed="true"]{border-color:#F28CB5;background:#FFF0F6;filter:none;opacity:1;box-shadow:0 0 0 3px rgba(242,140,181,.14)}
+.qghost:active{transform:scale(.94)}
+.qghost:focus-visible{outline:2px solid var(--lav);outline-offset:2px}
 .qghost-mark{font-size:15px;line-height:1}
+.qprivacy-note{position:fixed;z-index:120;top:max(16px,env(safe-area-inset-top));right:16px;max-width:min(310px,calc(100vw - 32px));padding:10px 14px;border:1px solid rgba(141,123,240,.2);border-radius:14px;background:#fff;color:var(--ink);box-shadow:0 10px 30px rgba(56,45,105,.18);font-size:13px;font-weight:800;animation:qprivacy-in .18s ease-out}
+.qprivacy-note.private{border-color:rgba(242,140,181,.45);background:#FFF5F9}
+@keyframes qprivacy-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.qghost{transition:none}.qprivacy-note{animation:none}}
 .qp-visibility{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .qp-visibility>div{display:flex;flex-direction:column;gap:2px;color:var(--ink)}
 .qp-visibility span{color:var(--ink2);font-size:12px;font-weight:700}

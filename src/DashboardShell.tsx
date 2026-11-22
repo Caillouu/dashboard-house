@@ -41,9 +41,10 @@ export function DashboardShell() {
   <section id="qtab" className="qtab" aria-label="Quêtes">
     <div className="qt-head"><h2>Quêtes</h2><button className="mini" type="button" data-act="qadd3-toggle" aria-label="Nouvelle quête">+ Nouvelle</button></div>
     <div id="q-score" className="qscore" aria-live="polite"></div>
-    <form id="f-qadd3" className="addform qadd" hidden><input className="in" id="q-title3" required maxLength={80} placeholder="Une idée ?" aria-label="Nouvelle quête" /><label className="qghost"><input id="q-private" type="checkbox" /> <span>👻 Seulement moi</span></label><button className="btn" type="submit">Ajouter</button></form>
+    <form id="f-qadd3" className="addform qadd" hidden><input className="in" id="q-title3" required maxLength={80} placeholder="Une idée ?" aria-label="Nouvelle quête" /><button id="q-private" className="qghost" type="button" data-act="qprivate-new" aria-pressed="false" aria-label="Rendre la quête visible seulement par moi" title="Quête partagée : toucher pour la rendre privée">👻</button><button className="btn" type="submit">Ajouter</button></form>
     <div id="qt-list" className="qt-list"></div>
   </section>
+  <div id="q-privacy-note" className="qprivacy-note" role="status" aria-live="polite" hidden></div>
 </div>
 <nav className="tabbar" aria-label="Sections">
   <button type="button" data-act="tab" data-tab="home" aria-label="Accueil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></button>
