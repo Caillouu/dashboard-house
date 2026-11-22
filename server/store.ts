@@ -1,5 +1,6 @@
 import { createClient, type Client } from '@libsql/client'
-import type { Mutation, Snapshot } from '../shared/protocol.ts'
+import { createHash } from 'node:crypto'
+import type { DashboardRequest, Mutation, Snapshot } from '../shared/protocol.ts'
 
 export function connectDatabase(env: NodeJS.ProcessEnv): Client {
   const url = env.TURSO_DATABASE_URL
@@ -50,4 +51,32 @@ export async function applyMutation(db: Client, op: Mutation) {
     return { ok: false, error: 'operation' }
   }
   return receipt.applied === 1 ? { ok: true, revision: op.revision + 1 } : { ok: false, error: 'conflict' }
+}
+
+type CharlieRecommendations = Extract<DashboardRequest, { a: 'charlieRecommendations' }>
+
+export async function addCharlieRecommendations(db: Client, appointments: CharlieRecommendations['appointments']) {
+  const statements = appointments.map(appointment => {
+    const id = 'charlie-' + createHash('sha256')
+      .update(appointment.key).update('\0').update(appointment.dueDate)
+      .digest('hex').slice(0, 24)
+    const [, month, day] = appointment.dueDate.split('-')
+    const metadata = {
+      source: 'charlie-monthly-skill',
+      recommendationKey: appointment.key,
+      dueDate: appointment.dueDate,
+      snoozeUntil: appointment.dueDate,
+      forceColor: 'o',
+      customText: `À faire le ${day}/${month}/${appointment.dueDate.slice(0, 4)}`,
+    }
+    const row = [id, 'Charlie', '🩺', '[IA] ' + appointment.title, '', '', 'jours', JSON.stringify(metadata)]
+    return {
+      sql: `INSERT INTO records (collection, id, data, revision)
+        VALUES ('routines', ?, ?, 1) ON CONFLICT(collection, id) DO NOTHING`,
+      args: [id, JSON.stringify(row)],
+    }
+  })
+  const results = await db.batch(statements, 'write')
+  const created = results.reduce((total, result) => total + result.rowsAffected, 0)
+  return { created, existing: appointments.length - created }
 }

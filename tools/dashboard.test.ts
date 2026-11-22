@@ -79,3 +79,59 @@ test('sessions, household state, repeated requests, and stale offline edits', as
     db.close()
   }
 })
+
+test('Charlie monthly recommendations are authenticated, dated, and idempotent', async () => {
+  const db = createClient({ url: 'file::memory:' })
+  try {
+    await migrate(db)
+    const env = {
+      CHARLIE_SKILL_SECRET: 'charlie-skill-secret-that-is-long-enough',
+    }
+    const body = {
+      a: 'charlieRecommendations',
+      appointments: [{
+        key: 'vaccin-rappel-2027',
+        title: 'Prendre rendez-vous pour le rappel de vaccin',
+        dueDate: '2027-04-15',
+      }],
+    }
+    const call = (authorization?: string) => dashboard(new Request('https://house.test/api/dashboard', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authorization ? { Authorization: authorization } : {}),
+      },
+      body: JSON.stringify(body),
+    }), () => db, env)
+
+    assert.equal((await call()).status, 401)
+    assert.equal((await call('Bearer wrong-secret')).status, 401)
+
+    const first = await call('Bearer ' + env.CHARLIE_SKILL_SECRET)
+    assert.equal(first.status, 200)
+    assert.deepEqual(await first.json(), { ok: true, created: 1, existing: 0 })
+
+    const second = await call('Bearer ' + env.CHARLIE_SKILL_SECRET)
+    assert.deepEqual(await second.json(), { ok: true, created: 0, existing: 1 })
+
+    const { rows } = await db.execute("SELECT id, data, revision FROM records WHERE collection = 'routines'")
+    assert.equal(rows.length, 1)
+    const routine = JSON.parse(String(rows[0].data))
+    assert.equal(routine[1], 'Charlie')
+    assert.equal(routine[3], '[IA] Prendre rendez-vous pour le rappel de vaccin')
+    assert.equal(routine[4], '')
+    assert.equal(routine[5], '')
+    assert.equal(routine[6], 'jours')
+    assert.deepEqual(JSON.parse(routine[7]), {
+      source: 'charlie-monthly-skill',
+      recommendationKey: 'vaccin-rappel-2027',
+      dueDate: '2027-04-15',
+      snoozeUntil: '2027-04-15',
+      forceColor: 'o',
+      customText: 'À faire le 15/04/2027',
+    })
+    assert.equal(rows[0].revision, 1)
+  } finally {
+    db.close()
+  }
+})

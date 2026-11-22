@@ -9,7 +9,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
      cliquer sur des boutons de l'app à l'insu de la personne). */
   if(window.top!==window.self){document.documentElement.textContent='Cette application ne peut pas s\'afficher à l\'intérieur d\'un autre site.';return}
   var S={projects:[],routines:[],shop:[],courses:[],voyages:[]};
-  var GROUPS=['Kimchi','Plantes','Maison'];
+  var GROUPS=['Joey','Charlie','Plantes','Maison'];
   var PRIO={high:'Urgent',med:'Pas urgent',low:'Idée'}, PW={high:3,med:2,low:1}, PEMO={high:'🔥',med:'⏳',low:'💡'};
   /* Urgence d'une quête : juste un émoji ; un appui ouvre un petit menu (🔥 Urgent, ⏳ Pas urgent, 💡 Idée) */
   function prioBtn(o){var p=PRIO[o.prio]?o.prio:'med';return '<button type="button" class="prb '+p+'" data-act="prio-menu" data-id="'+esc(o.id)+'" aria-haspopup="menu" aria-label="Urgence : '+PRIO[p]+'" title="'+PRIO[p]+'">'+PEMO[p]+'</button>'}
@@ -92,7 +92,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     c.forEach(function(f,j){if(f!=='_t')o[f]=r[j]==null?'':String(r[j]).trim()});
     if(!o.createdAt)o.createdAt=9e12+i;
     if(k==='routines'){o.lastDone=nDate(o.lastDone);o.snoozeUntil=nDate(o.snoozeUntil);o.everyN=o.everyN?(Number(String(o.everyN).replace(',','.'))||''):'';o.everyUnit=/^s/i.test(o.everyUnit)?'sem':'j';o.mode='rec';
-      var g=nrm(o.group);o.group=g.indexOf('plant')===0?'Plantes':(g.indexOf('kim')===0||g.indexOf('chien')===0)?'Kimchi':(!g||g==='maison'||g==='menage'||g==='entretien')?'Maison':String(o.group).trim().slice(0,24)}
+      var g=nrm(o.group);o.group=g.indexOf('plant')===0?'Plantes':(g.indexOf('kim')===0||g.indexOf('joey')===0||g.indexOf('chien')===0)?'Joey':g.indexOf('charlie')===0?'Charlie':(!g||g==='maison'||g==='menage'||g==='entretien')?'Maison':String(o.group).trim().slice(0,24)}
     if(k==='shop'){o.budget=o.budget?(Number(String(o.budget).replace(/[^\d.,]/g,'').replace(',','.'))||''):'';
       var w=nrm(o.who);o.who=(PEOPLE.p1&&w===nrm(PEOPLE.p1))?'p1':(PEOPLE.p2&&w===nrm(PEOPLE.p2))?'p2':'couple';o.urgency=URG[nrm(o.urgency)]||'med';o.done=yes(o.done)}
     if(k==='courses'){o.done=yes(o.done)}
@@ -660,7 +660,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     else if(v==='agenda'){setTab('agenda')}}
   /* Routines : checklist globale de tout ce qui est en retard (rouge) ou bientôt dû (orange) */
   function renderTodoAll(){var el=$('l-todoall');if(!el)return;
-    var R={r:0,o:1},GL={Kimchi:'Kimchi',Plantes:'Plantes',Maison:'Maison'};
+    var R={r:0,o:1},GL={Joey:'Joey',Charlie:'Charlie',Plantes:'Plantes',Maison:'Maison'};
     var L=S.routines.map(function(r){return {r:r,st:careState(r)}}).filter(isDue)
       .sort(function(a,b){if(R[a.st.c]!==R[b.st.c])return R[a.st.c]-R[b.st.c];return (a.r.lastDone||'')<(b.r.lastDone||'')?-1:1});
     var td=iso(new Date()),dn=S.routines.filter(function(r){return r.lastDone===td}).length,c=$('ta-count');if(c)c.textContent=dn?dn+'/'+(L.length+dn):'';   /* jamais « 0/N » */
@@ -1518,7 +1518,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     else if(a==='grp-emo'){if(grpEdit){grpEdit.emoji=b.getAttribute('data-e');iconOpen=false;renderSheet()}}
     else if(a==='grp-save'){if(grpEdit){var gin=document.querySelector('.sheet-card [data-grp]'),gsp=splitEmoji(gin?gin.value:grpEdit.name),gname=(gsp.title||'').trim().slice(0,24),gemo=gsp.emoji||grpEdit.emoji||'📦',gk=nrm(gname);
       if(!gname){if(gin)gin.focus();return}
-      if(gk.indexOf('plant')===0||gk.indexOf('kim')===0||gk.indexOf('chien')===0||gk==='maison'||gk==='menage'||gk==='entretien'){toastMsg('Ce nom est réservé');return}
+      if(gk.indexOf('plant')===0||gk.indexOf('kim')===0||gk.indexOf('joey')===0||gk.indexOf('charlie')===0||gk.indexOf('chien')===0||gk==='maison'||gk==='menage'||gk==='entretien'){toastMsg('Ce nom est réservé');return}
       if(customGroups().some(function(g){return nrm(g.name)===gk&&g.id!==grpEdit.id})){toastMsg('Cette routine existe déjà');return}
       if(grpEdit.id==='new'){addDoc('routines',{group:gname,emoji:gemo,title:'',grp:1,lastDone:null})}
       else{var gold=grpEdit.oldName;
@@ -1555,7 +1555,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     else if(a==='snooze-clear'){var pvc=snap('routines',id,['snoozeUntil']);openId=null;calFor=null;upd('routines',id,{snoozeUntil:null});renderSheet();offerUndo('routines',id,pvc,'La tâche est de retour ✓')}
     else if(a==='snz-other'){snzOther=!snzOther;renderSheet();if(snzOther){var sni=document.querySelector('.sheet-card [data-snzn]');if(sni){sni.focus();sni.select()}}}
     else if(a==='undo'){openId=null;calFor=null;undoDate(id);renderSheet()}
-    else if(a==='del'){var rg=(find('routines',id)||{}).group;openId=null;calFor=null;confirmDel=null;renderSheet();delUndo('routines',id,rg==='Plantes'?'Plante supprimée':rg==='Kimchi'?'Tâche de Kimchi supprimée':'Tâche maison supprimée')}
+    else if(a==='del'){var rg=(find('routines',id)||{}).group;openId=null;calFor=null;confirmDel=null;renderSheet();delUndo('routines',id,rg==='Plantes'?'Plante supprimée':(rg==='Joey'||rg==='Charlie')?'Tâche de '+rg+' supprimée':'Tâche maison supprimée')}
     else if(a==='wishq-toggle'){var fw=$('f-wish');fw.hidden=!fw.hidden;if(!fw.hidden)$('w-title').focus()}
     else if(a==='add-detail'){
       var fm=b.closest('form'),inp=fm&&fm.querySelector('input'),val=inp?inp.value:'',sq=splitEmoji(val),nid=null;

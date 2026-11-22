@@ -153,6 +153,8 @@ def main():
                 page.screenshot(path=f'{OUT}/{name}-accueil.png')
                 page.evaluate("(()=>{const b=document.createElement('button');b.dataset.act='tab';b.dataset.tab='maison';document.body.appendChild(b);b.click();b.remove()})()"); page.wait_for_timeout(300)
                 page.screenshot(path=f'{OUT}/{name}-routines.png', full_page=True)
+                assert page.is_visible('#l-Joey') and page.is_visible('#l-Charlie'), 'routines Joey et Charlie présentes par défaut'
+                assert page.locator('.s-kimchi h2').inner_text() == 'Joey', 'Kimchi doit être affiché sous le nom Joey dans les routines'
                 if name == 'mobile':
                     assert page.locator('#l-todoall .tarow').count() == 1, 'checklist À faire'
                     page.click('#l-todoall [data-act=care-chk]'); page.wait_for_timeout(800)
@@ -160,15 +162,15 @@ def main():
                     assert 'Tout est à jour' in page.inner_text('#l-todoall')
                     page.click('[data-act=undo-upd]'); page.wait_for_timeout(800)
                     # le rond d'une carte de routine coche directement, et le texte ouvre la fiche
-                    page.click('#l-Kimchi [data-act=care-chk]'); page.wait_for_timeout(800)
+                    page.click('#l-Joey [data-act=care-chk]'); page.wait_for_timeout(800)
                     assert state['routines'][0][4] == time.strftime('%Y-%m-%d'), state['routines'][0]
-                    page.click('#l-Kimchi [data-act=care-chk]'); page.wait_for_timeout(800)
+                    page.click('#l-Joey [data-act=care-chk]'); page.wait_for_timeout(800)
                     assert state['routines'][0][4] != time.strftime('%Y-%m-%d'), 'le 2e tap devrait annuler'
-                    page.click('#l-Kimchi .row .t'); page.wait_for_timeout(300)
+                    page.click('#l-Joey .row .t'); page.wait_for_timeout(300)
                     assert page.is_visible('.sheet-card .bigdone'); page.click('.sheet-x'); page.wait_for_timeout(200)
                     # déjà fait aujourd'hui : plus de gros bouton vert, un bouton discret qui annule
-                    page.click('#l-Kimchi [data-act=care-chk]'); page.wait_for_timeout(800)
-                    page.click('#l-Kimchi .row .t'); page.wait_for_timeout(300)
+                    page.click('#l-Joey [data-act=care-chk]'); page.wait_for_timeout(800)
+                    page.click('#l-Joey .row .t'); page.wait_for_timeout(300)
                     assert not page.is_visible('.sheet-card .bigdone') and page.is_visible('.sheet-card .donetoday')
                     page.click('.sheet-card .donetoday'); page.wait_for_timeout(800)
                     assert state['routines'][0][4] != time.strftime('%Y-%m-%d'), 'le bouton « fait aujourd\'hui » annule'
@@ -206,7 +208,7 @@ def main():
                     page.click('.tabbar [data-tab=home]'); page.wait_for_timeout(300)
                     assert 'Vider le lave-vaisselle' in page.inner_text('#l-main') + page.inner_text('#hub3'), 'missions maison sur l\'accueil'
                     page.evaluate("(()=>{const b=document.createElement('button');b.dataset.act='tab';b.dataset.tab='maison';document.body.appendChild(b);b.click();b.remove()})()"); page.wait_for_timeout(300)
-                    # nouvelle section de routines : nom + icône, puis des tâches comme Kimchi / Maison
+                    # nouvelle section de routines : nom + icône, puis des tâches comme Joey / Maison
                     page.click('[data-act=grp-new]'); page.wait_for_timeout(300)
                     page.fill('.sheet-card [data-grp=name]', '🚲 Vélo'); page.click('.sheet-card [data-act=grp-save]'); page.wait_for_timeout(800)
                     grow = [r for r in state['routines'] if r[1] == 'Vélo']

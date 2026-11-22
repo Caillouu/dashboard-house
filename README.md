@@ -35,6 +35,7 @@ npm run build
 | `SESSION_SECRET` | Valeur aléatoire générée pour cet environnement |
 | `MEMBER_1_CODE` | Code aléatoire personnel du premier membre |
 | `MEMBER_2_CODE` | Code aléatoire personnel du deuxième membre |
+| `CHARLIE_SKILL_SECRET` | Secret aléatoire d’au moins 32 caractères partagé uniquement avec le skill mensuel Charlie |
 | `PERSON_1` et `PERSON_2` | Prénoms facultatifs qui s’affichent dans la wishlist |
 | `WEATHER_LAT`, `WEATHER_LON` et `WEATHER_CITY` | Localisation facultative de la première carte météo, Paris par défaut |
 
@@ -51,6 +52,40 @@ L’agenda est facultatif. Dans Google Cloud, active l’API Google Calendar et 
 3. Dans Vercel, ajoute `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` et `CALENDAR_IDS`. Sépare les identifiants des agendas par des virgules. Redéploie le projet. Vérifie l’onglet Agenda et les filtres, puis les logs Vercel si un agenda manque.
 
 Voir [la documentation Google sur les jetons de renouvellement](https://developers.google.com/identity/protocols/oauth2#expiration).
+
+## Skill mensuel Charlie
+
+Le skill mensuel appelle le même point d’entrée que l’application, `POST /api/dashboard`, sans cookie utilisateur. Il s’authentifie avec `Authorization: Bearer <CHARLIE_SKILL_SECRET>` et envoie un corps JSON de cette forme :
+
+```json
+{
+  "a": "charlieRecommendations",
+  "appointments": [
+    {
+      "key": "vaccin-rappel-2027",
+      "title": "Prendre rendez-vous pour le rappel de vaccin",
+      "dueDate": "2027-04-15"
+    }
+  ]
+}
+```
+
+- `key` est l’identifiant stable de la recommandation dans le skill (1 à 100 caractères parmi lettres, chiffres, `.`, `_`, `:`, `-`).
+- `title` décrit clairement le rendez-vous ; l’API ajoute elle-même le préfixe obligatoire `[IA] `.
+- `dueDate` est la date d’apparition dans la routine Charlie, au format `YYYY-MM-DD`, même plusieurs mois à l’avance.
+- Un lot contient de 1 à 50 rendez-vous. La réponse indique `created` et `existing`.
+- L’identifiant stocké dépend de `key` et `dueDate`. Rejouer le même lot est donc sans effet et ne crée pas de doublon. Pour déplacer une recommandation, le skill envoie la nouvelle échéance ; l’ancienne entrée reste volontairement inchangée afin de ne pas écraser une action utilisateur.
+
+Exemple d’appel :
+
+```sh
+curl https://dashboard.example/api/dashboard \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $CHARLIE_SKILL_SECRET" \
+  --data '{"a":"charlieRecommendations","appointments":[{"key":"vaccin-rappel-2027","title":"Prendre rendez-vous pour le rappel de vaccin","dueDate":"2027-04-15"}]}'
+```
+
+Le skill doit conserver ce secret côté serveur et ne jamais l’inclure dans un lien, un mail ou du code client. Après ajout ou modification de la variable dans Vercel, il faut redéployer pour qu’elle soit disponible à la fonction.
 
 ## Hors ligne et conflits
 

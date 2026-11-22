@@ -1157,7 +1157,7 @@ body[data-tab="home"][data-view="simple"] .sc-txt h2{font-size:17px}
 /* v84 : sections de routines personnalisées */
 .cgroups{display:contents}
 /* sur le tableau de bord (12 colonnes), une section personnalisée prend la même place
-   que Kimchi, Plantes ou Maison : sans ça elle tombait sur une seule colonne */
+   que Joey, Charlie, Plantes ou Maison : sans ça elle tombait sur une seule colonne */
 body[data-tab="home"] .cgroups>.cgrp{grid-column:span 3}
 body[data-tab="courses"] .cgroups,body[data-tab="voyage"] .cgroups{display:none}
 .gic{font-size:13px;display:flex;align-items:center;justify-content:center}

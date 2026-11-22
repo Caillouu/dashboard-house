@@ -19,9 +19,18 @@ const mutation = z.union([
   z.object({ a: z.literal('del'), t: collections, id, ...metadata }),
   z.object({ a: z.literal('setting'), ...metadata }).and(settings),
 ])
+const charlieRecommendations = z.object({
+  a: z.literal('charlieRecommendations'),
+  appointments: z.array(z.object({
+    key: z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9._:-]+$/),
+    title: z.string().trim().min(1).max(100),
+    dueDate: z.iso.date(),
+  })).min(1).max(50),
+})
 export const request = z.union([
   z.object({ a: z.literal('login'), member: z.enum(['p1', 'p2']), code: z.string().min(1).max(200) }),
   z.object({ a: z.enum(['load', 'logout', 'agenda', 'weather']) }),
+  charlieRecommendations,
   mutation,
 ])
 export type Mutation = z.infer<typeof mutation>
