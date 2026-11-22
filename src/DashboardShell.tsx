@@ -69,12 +69,13 @@ export function DashboardShell() {
   <button type="button" data-act="tab" data-tab="dettes" aria-label="Dettes"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5c-.8-.7-1.8-1-3-1-1.9 0-3.5 1.2-3.5 2.8s1.4 2.3 3.2 2.7 3.1 1 3.1 2.6-1.5 2.9-3.6 2.9c-1.3 0-2.5-.4-3.3-1.2M12 5.5v2M12 18.5v-2"/></svg><span>Dettes</span></button>
 </nav>
 <dialog id="debts-clear-dialog" className="confirm-dialog" aria-labelledby="debts-clear-title" aria-describedby="debts-clear-description">
-  <div className="confirm-dialog-icon" aria-hidden="true">↺</div>
-  <h2 id="debts-clear-title">Repartir de zéro ?</h2>
-  <p id="debts-clear-description">Toutes les dépenses seront supprimées. Cette action ne pourra pas être annulée.</p>
+  <div className="confirm-dialog-head">
+    <span className="confirm-dialog-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 12h8l1-12M10 11v5M14 11v5" /></svg></span>
+    <div><h2 id="debts-clear-title">Effacer les dettes ?</h2><p id="debts-clear-description">Les comptes repartiront de zéro.</p></div>
+  </div>
   <div className="confirm-dialog-actions">
-    <button className="btn ghost" type="button" data-act="debts-clear-cancel">Annuler</button>
-    <button className="btn danger" type="button" data-act="debts-clear-confirm">Tout effacer</button>
+    <button className="mini confirm-cancel" type="button" data-act="debts-clear-cancel">Annuler</button>
+    <button className="mini confirm-delete" type="button" data-act="debts-clear-confirm">Effacer</button>
   </div>
 </dialog>
 <section id="cview" className="qview cview" hidden aria-label="Liste de courses">
