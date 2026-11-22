@@ -46,6 +46,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 .head h1{font-size:clamp(34px,4.2vw,50px);line-height:1;margin-top:2px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
 .mascot{flex:none;width:112px;margin-block:-8px;position:relative}.mascot::after{content:"";position:absolute;left:20%;right:20%;bottom:4px;height:14px;border-radius:50%;background:radial-gradient(closest-side,rgba(141,123,240,.3),transparent);z-index:-1}
 .mascot img{display:block;width:100%;height:auto;aspect-ratio:256/244}
+.mascot img,.sc-k,.qhero-h img{transform-origin:50% 82%;animation:mascot-wob 3s ease-in-out infinite}
+@keyframes mascot-wob{0%,100%{rotate:-3.5deg}50%{rotate:3.5deg}}
+@media (prefers-reduced-motion:reduce){.mascot img,.sc-k,.qhero-h img{animation:none}}
 #banner .note{font-size:14px;font-weight:800;border-radius:999px;padding:6px 14px;background:var(--o-bg);color:var(--o-ink)}
 /* grid */
 .grid{flex:0 1 640px;min-height:0;display:grid;gap:14px;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(0,1.25fr) minmax(0,1fr)}
@@ -927,7 +930,7 @@ body[data-tab="home"][data-view="simple"] .hub3{display:flex;flex-direction:colu
 .sc-wrap{position:relative;width:100%;max-width:360px;margin:0 auto}
 .sc-svg{display:block;width:100%;height:auto}
 .sc-k{position:absolute;left:50%;bottom:6%;width:38%;transform:translateX(-50%);filter:drop-shadow(0 8px 12px rgba(60,40,120,.18))}
-.sc-k.jump{animation:kjump .9s ease}
+.sc-k.jump{animation:kjump .9s ease,mascot-wob 3s ease-in-out infinite}
 .sc-g{display:flex;justify-content:space-between;align-items:center;max-width:300px;margin:2px auto 0;font-size:12px;font-weight:800;color:var(--ink2)}
 .sc-g b{font-size:14px;color:var(--ink)}
 .scene.night .sc-g,.scene.night .sc-g b{color:#fff}
