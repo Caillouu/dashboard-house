@@ -676,6 +676,9 @@ import { isDisplayableRecord } from './src/records.ts'
     if(cal.status!=='ok'&&cal.status!=='loading')body='<p class="empty">L\'agenda ne répond pas pour le moment.</p>'+body;
     var nHid=cal.status==='ok'?cal.events.filter(function(e){return e&&HID.indexOf(e.id)>=0}).length:0;
     var searchButton='<div class="ag-tools"><button type="button" class="ag-search-toggle" data-act="ag-search-toggle" aria-expanded="'+agSearch.open+'"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg><span>Rechercher une date</span></button></div>';
+    /* La recherche est un mode dédié : la chronologie courante ne doit pas concurrencer
+       visuellement les résultats de la période choisie. */
+    if(agSearch.open){el.innerHTML=searchButton+agSearchPanel();return}
     el.innerHTML=searchButton+agSearchPanel()+(filters?'<div class="ag-filters" role="group" aria-label="Agendas synchronisés">'+filters+'</div>':'')+'<div class="ag-list">'+body+'</div>'+(nHid?'<button class="lnk ag-hid" data-act="ag-hid">'+nHid+' événement'+(nHid>1?'s':'')+' masqué'+(nHid>1?'s':'')+' · tout réafficher</button>':'')+
       '<a class="ag-gc" href="https://calendar.google.com/calendar/u/0/r/week" target="_blank" rel="noopener noreferrer">Ouvrir Google Agenda ↗</a>';
     if(focusId!==null)Array.prototype.some.call(el.querySelectorAll('[data-calendar]'),function(button){if(button.getAttribute('data-calendar')!==focusId)return false;button.focus({preventScroll:true});return true});
