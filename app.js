@@ -1623,6 +1623,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     else if(a==='debts-clear'){openDebtClear()}
     else if(a==='debts-clear-cancel'){var debtDialog=$('debts-clear-dialog');if(debtDialog)debtDialog.close()}
     else if(a==='debts-clear-confirm'){clearDebts()}
+    else if(a==='debt-add-toggle'){var debtForm=$('f-debt');debtForm.hidden=!debtForm.hidden;if(!debtForm.hidden)$('debt-title').focus()}
     else if(a==='cview-open'){cview(true,true)}
     else if(a==='cview-close'){cview(false,true)}
     else if(a==='qview-open'){setTab('quetes')}
@@ -1647,9 +1648,9 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
 
   /* Les boutons + deviennent − quand leur formulaire est ouvert */
   function syncPlus(){
-    var pairs=[['[data-act="qadd3-toggle"]','#f-qadd3'],['[data-act="add-toggle"]','#f-add'],['[data-act="wishq-toggle"]','#f-wish'],['[data-act="course-toggle"]','#f-course'],['[data-act="qadd-toggle"]','#f-qadd']];
+    var pairs=[['[data-act="qadd3-toggle"]','#f-qadd3'],['[data-act="debt-add-toggle"]','#f-debt'],['[data-act="add-toggle"]','#f-add'],['[data-act="wishq-toggle"]','#f-wish'],['[data-act="course-toggle"]','#f-course'],['[data-act="qadd-toggle"]','#f-qadd']];
     pairs.forEach(function(p){var b=document.querySelector(p[0]),f=document.querySelector(p[1]);if(!b||!f)return;var open=!f.hidden;
-      b.setAttribute('aria-expanded',open);b.textContent=p[0].indexOf('qadd')>=0||p[0].indexOf('qadd3')>=0?(open?'− Fermer':'+ Nouvelle'):(open?'−':'+')});
+      b.setAttribute('aria-expanded',open);b.textContent=p[0].indexOf('qadd')>=0||p[0].indexOf('debt-add')>=0?(open?'− Fermer':'+ Nouvelle'):(open?'−':'+')});
     [].forEach.call(document.querySelectorAll('form.care-add'),function(f){var sec=f.closest('section'),b=sec&&sec.querySelector('[data-act="care-add"]');if(!b)return;var open=!f.hidden;b.setAttribute('aria-expanded',open);b.textContent=open?'−':'+'});
   }
   document.addEventListener('click',function(){setTimeout(syncPlus,0)});
@@ -1681,7 +1682,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
       var debtTitle=$('debt-title'),debtAmount=$('debt-amount'),amount=Math.round(Number(debtAmount.value)*100)/100;
       if(!debtTitle.value.trim()||!(amount>0))return;
       addDoc('debts',{title:debtTitle.value.trim().slice(0,80),amount:amount,payer:$('debt-payer').value==='p2'?'p2':'p1'});
-      debtTitle.value='';debtAmount.value='';debtTitle.focus();return;
+      debtTitle.value='';debtAmount.value='';f.hidden=true;return;
     }
     if(f.getAttribute('data-form')==='tplitem'){var ti2=f.querySelector('input'),tv2=ti2.value.trim().slice(0,80);if(!tv2||!tplEdit)return;
       tplEdit.items.push(tv2);renderSheet();var ti3=document.querySelector('.sheet-card [data-tplinput]');if(ti3)ti3.focus();return}

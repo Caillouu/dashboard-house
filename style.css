@@ -1321,18 +1321,15 @@ body[data-tab="dettes"]{overflow:auto;display:block}
 body[data-tab="dettes"] .head,body[data-tab="dettes"] .grid,body[data-tab="dettes"] .ptitle{display:none}
 body[data-tab="dettes"] .wrap{justify-content:flex-start;max-width:720px}
 body[data-tab="dettes"] .debts-tab{display:flex;flex-direction:column;gap:14px;width:100%;padding-bottom:calc(max(10px,env(safe-area-inset-bottom,0px)) + 82px)}
-.debts-head{padding:4px 2px 2px}
+.debts-head{padding:4px 2px}
 .debts-head h2{font-size:28px}
-.debts-head p{margin:2px 0 0;color:var(--ink2);font-size:13px;font-weight:700}
-.debt-form{display:grid;grid-template-columns:minmax(180px,2fr) minmax(100px,.8fr) minmax(140px,1fr) auto;align-items:end;gap:10px;background:rgba(255,255,255,.9);border:1.5px solid rgba(141,123,240,.10);border-radius:22px;padding:14px;box-shadow:0 8px 22px rgba(80,60,160,.08)}
-.debt-form-head{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin-bottom:2px}
-.debt-form-head .ic{width:34px;height:34px}
-.debt-form-head h3{font-family:var(--font-d);font-size:17px;font-weight:600}
-.debt-form-head p{margin:1px 0 0;color:var(--ink2);font-size:12px;font-weight:700}
-.debt-form label{display:flex;flex-direction:column;gap:6px;min-width:0;color:var(--ink2);font-size:12px;font-weight:900}
-.debt-form .in{width:100%;min-height:38px;border-radius:13px;background:var(--n-bg);box-shadow:none;font-size:13px}
-.debt-submit{min-height:38px;padding:7px 14px;border:0;border-radius:999px;background:var(--lav);color:#fff;font-size:13px;font-weight:900}
-.debt-submit span{font-size:18px;font-weight:700;line-height:0}
+.debts-head .mini{font-size:12px;padding:7px 14px}
+.debt-form{margin:0;flex-wrap:wrap}
+.debt-form #debt-title{flex:1 1 230px}
+.debt-form #debt-amount{flex:0 1 120px}
+.debt-form #debt-payer{flex:0 1 auto;max-width:160px}
+.debt-form .in{min-height:34px}
+.debt-form .btn{min-height:34px}
 .debts-list-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 2px -4px}
 .debts-list-head h3{font-family:var(--font-d);font-size:15px;font-weight:600;color:var(--ink2)}
 .debts-clear{min-height:30px;padding:5px 11px;border:0;border-radius:999px;background:var(--peach-soft);color:#A5432B;font-size:11px;font-weight:900}
@@ -1371,9 +1368,9 @@ body[data-tab="dettes"] .debts-tab{display:flex;flex-direction:column;gap:14px;w
   .tabbar{width:calc(100% - 16px);justify-content:space-around}
   .tabbar button{padding-inline:5px;font-size:10px}
   .tabbar svg{width:18px;height:18px}
-  .debt-form{grid-template-columns:1fr 1fr}
-  .debt-form label:nth-of-type(1){grid-column:1/-1}
-  .debt-submit{grid-column:1/-1;width:100%}
+  .debt-form #debt-title{flex-basis:100%}
+  .debt-form #debt-amount{flex:1 1 110px}
+  .debt-form #debt-payer{flex:1 1 130px;max-width:none}
   .debts-balance{align-items:flex-start;flex-direction:column}
   .debts-balance strong{text-align:left}
 }
