@@ -10,7 +10,7 @@ import { isDisplayableRecord } from './src/records.ts'
      cliquer sur des boutons de l'app à l'insu de la personne). */
   if(window.top!==window.self){document.documentElement.textContent='Cette application ne peut pas s\'afficher à l\'intérieur d\'un autre site.';return}
   var S={projects:[],routines:[],shop:[],courses:[],voyages:[],debts:[]};
-  var GROUPS=['Joey','Charlie','Justine','Plantes','Maison'];
+  var GROUPS=['Joey','Charlie','Plantes','Maison'];
   var PRIO={high:'Urgent',med:'Pas urgent',low:'Idée'}, PW={high:3,med:2,low:1}, PEMO={high:'🔥',med:'⏳',low:'💡'};
   /* Urgence d'une quête : juste un émoji ; un appui ouvre un petit menu (🔥 Urgent, ⏳ Pas urgent, 💡 Idée) */
   function prioBtn(o){var p=PRIO[o.prio]?o.prio:'med';return '<button type="button" class="prb '+p+'" data-act="prio-menu" data-id="'+esc(o.id)+'" aria-haspopup="menu" aria-label="Urgence : '+PRIO[p]+'" title="'+PRIO[p]+'">'+PEMO[p]+'</button>'}
@@ -469,7 +469,8 @@ import { isDisplayableRecord } from './src/records.ts'
     renderRoutineScore();
     GROUPS.forEach(function(g){
       var list=S.routines.filter(function(r){return !r.grp&&r.group===g}).sort(sortCare);
-      $('l-'+g).innerHTML=list.length?list.map(g==='Plantes'?plantTile:careRow).join(''):empty('routines','Rien ici pour le moment.');
+      var host=$('l-'+g);if(!host)return;
+      host.innerHTML=list.length?list.map(g==='Plantes'?plantTile:careRow).join(''):empty('routines','Rien ici pour le moment.');
     });
     renderCustomCare();
   }
