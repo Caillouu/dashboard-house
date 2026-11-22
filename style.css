@@ -1033,7 +1033,7 @@ body[data-tab="agenda"] .agtab{display:flex;flex-direction:column;gap:14px;max-w
 .ag-list{display:flex;flex-direction:column;gap:16px}
 .ag-g h3{margin:0 4px 8px;font-family:var(--font-d);font-weight:600;font-size:17px}
 .ag-g{scroll-margin-top:20px}
-.ag-it{--ag-color:transparent;position:relative;display:flex;align-items:center;gap:12px;width:100%;border:0;border-left:4px solid var(--ag-color);background:#fff;border-radius:18px;padding:12px 14px 12px 12px;margin-bottom:8px;font:inherit;text-align:left;color:var(--ink);cursor:pointer;box-shadow:0 0 0 1.5px rgba(141,123,240,.10)}
+.ag-it{position:relative;display:flex;align-items:center;gap:12px;width:100%;border:0;border-left:4px solid var(--ag-color,transparent);background:#fff;border-radius:18px;padding:12px 14px 12px 12px;margin-bottom:8px;font:inherit;text-align:left;color:var(--ink);cursor:pointer;box-shadow:0 0 0 1.5px rgba(141,123,240,.10)}
 .ag-it.trip{background:var(--lav-soft)}
 .ag-k{flex:none;min-width:64px;font-size:12px;font-weight:800;color:var(--lav)}
 .ag-t{flex:1;min-width:0;font-weight:800;font-size:14px;overflow-wrap:anywhere}

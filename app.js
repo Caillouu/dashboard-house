@@ -1352,6 +1352,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
 
   /* À venir : événements Google Agenda (lus par le script, en lecture seule) */
   var eventIcons=[
+    [/\bsarah maman\b/,'👶'],
     [/\bflights?\b/,'✈️'],
     [/\bsoirees?\b/,'🎉'],
     [/\b(?:foot|aja)\b/,'⚽'],
