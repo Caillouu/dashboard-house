@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const widths = { routines: 8, shop: 10, projects: 6, courses: 7, voyages: 12 } as const
 export const collections = z.enum(['routines', 'shop', 'projects', 'courses', 'voyages'])
 export type Collection = z.infer<typeof collections>
+export type Member = 'p1' | 'p2'
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/)
 const metadata = { operationId: z.uuid(), revision: z.number().int().nonnegative() }
 const settings = z.discriminatedUnion('name', [
@@ -47,4 +48,5 @@ export type Snapshot = {
   settings: { hiddenEvents?: string[]; eventNames?: Record<string, string> }
   revisions: Record<string, number>
   people: { p1: string; p2: string }
+  questScores: { p1: number; p2: number }
 }
