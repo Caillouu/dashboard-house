@@ -5,6 +5,7 @@ import { createClient } from '@libsql/client'
 import { dashboard } from '../server/handler.ts'
 import { migrate } from './migrate.ts'
 import { mascotPhrase, randomMascot } from '../src/mascot.ts'
+import { isDisplayableRecord } from '../src/records.ts'
 
 test('mascots alternate and keep their matching phrase', () => {
   const first = randomMascot()
@@ -12,6 +13,18 @@ test('mascots alternate and keep their matching phrase', () => {
   assert.notEqual(second.name, first.name)
   assert.match(mascotPhrase(first, 'sunny'), new RegExp(first.name))
   assert.match(mascotPhrase(second, 'unknown'), new RegExp(second.name))
+})
+
+test('a custom routine marker remains displayable after a server reload', () => {
+  assert.equal(isDisplayableRecord('routines', {
+    id: 'bike', group: 'Vélo', title: '', grp: 1,
+  }), true)
+  assert.equal(isDisplayableRecord('routines', {
+    id: 'broken', group: '', title: '', grp: 1,
+  }), false)
+  assert.equal(isDisplayableRecord('projects', {
+    id: 'empty-project', title: '',
+  }), false)
 })
 
 test('sessions, household state, repeated requests, and stale offline edits', async () => {

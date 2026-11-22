@@ -1,6 +1,7 @@
 import { api, APIError, cacheKey, sessionKey, readQueue, saveOperation, removeOperation, isQueueChange, target } from './src/transport.ts'
 import { setupControls, showLogin, hideLogin, showSync } from './src/controls.tsx'
 import { randomMascot, mascotPhrase } from './src/mascot.ts'
+import { isDisplayableRecord } from './src/records.ts'
 
 (function(){
   'use strict';
@@ -144,7 +145,7 @@ import { randomMascot, mascotPhrase } from './src/mascot.ts'
     QUEST_SCORES={p1:Number(j.questScores&&j.questScores.p1)||0,p2:Number(j.questScores&&j.questScores.p2)||0};
     ROUTINE_SCORES={p1:Number(j.routineScores&&j.routineScores.p1)||0,p2:Number(j.routineScores&&j.routineScores.p2)||0};
     Object.keys(SHT).forEach(function(k){
-      S[k]=j.sheets[k].map(function(r,i){return fromRow(k,r,i)}).filter(function(row){return row.id&&row.title});
+      S[k]=j.sheets[k].map(function(r,i){return fromRow(k,r,i)}).filter(function(row){return isDisplayableRecord(k,row)});
     });
     var st=j.settings||{};
     HID=Array.isArray(st.hiddenEvents)?st.hiddenEvents.map(String):[];

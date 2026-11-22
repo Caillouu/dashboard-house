@@ -213,6 +213,8 @@ def main():
                     page.fill('.sheet-card [data-grp=name]', '🚲 Vélo'); page.click('.sheet-card [data-act=grp-save]'); page.wait_for_timeout(800)
                     grow = [r for r in state['routines'] if r[1] == 'Vélo']
                     assert grow and '"grp":1' in grow[0][7], state['routines']
+                    page.reload(); page.wait_for_timeout(800)
+                    assert page.locator('.cgrp h2', has_text='Vélo').is_visible(), 'la routine doit rester visible après rechargement'
                     page.click('.cgrp [data-act=care-add]'); page.wait_for_timeout(200)
                     page.fill('.cgrp form.care-add input', 'Gonfler les pneus'); page.keyboard.press('Enter'); page.wait_for_timeout(800)
                     assert any(r[1] == 'Vélo' and r[3] == 'Gonfler les pneus' for r in state['routines']), state['routines']
