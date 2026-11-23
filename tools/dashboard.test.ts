@@ -7,6 +7,31 @@ import { dashboard } from '../server/handler.ts'
 import { migrate } from './migrate.ts'
 import { mascotPhrase, randomMascot } from '../src/mascot.ts'
 import { isDisplayableRecord } from '../src/records.ts'
+import { debtReminder, monthlyMessage } from '../server/notifications.ts'
+
+test('debt reminders wait 15 days and target only the current debtor', () => {
+  const createdAt = Date.parse('2026-11-01T10:00:00Z')
+  const debts = [
+    { data: JSON.stringify(['a', 'Courses', 60, 'p1', JSON.stringify({ createdAt })]) },
+    { data: JSON.stringify(['b', 'Restaurant', 20, 'p2', JSON.stringify({ createdAt: createdAt + 86400_000 })]) },
+  ]
+  assert.equal(debtReminder(debts, new Date('2026-11-15T09:59:59Z')), null)
+  assert.deepEqual(debtReminder(debts, new Date('2026-11-16T10:00:00Z')), { member: 'p2', amount: 20 })
+  assert.deepEqual(debtReminder([
+    ...debts,
+    { data: JSON.stringify(['c', 'Train', 100, 'p2', JSON.stringify({ createdAt: createdAt + 2 * 86400_000 })]) },
+  ], new Date('2026-11-20T10:00:00Z')), { member: 'p1', amount: 30 })
+})
+
+test('monthly messages report the winner percentage, ties, and empty months', () => {
+  const people = { p1: 'Pierre', p2: 'Justine' }
+  assert.deepEqual(monthlyMessage({ p1: 6, p2: 4 }, people, '2026-10'), {
+    title: 'Bilan de octobre 2026',
+    body: 'Pierre en tête : 6 actions sur 10 (60 %), quêtes et routines confondues.',
+  })
+  assert.match(monthlyMessage({ p1: 3, p2: 3 }, people, '2026-10').body, /Égalité/)
+  assert.match(monthlyMessage({ p1: 0, p2: 0 }, people, '2026-10').body, /Aucune/)
+})
 
 test('every static routine group has a matching dashboard container', () => {
   const app = readFileSync(new URL('../app.js', import.meta.url), 'utf8')
@@ -126,9 +151,14 @@ test('sessions, household state, repeated requests, and stale offline edits', as
     assert.deepEqual(await (await call(completedQuest, cookie2)).json(), { ok: true, revision: 2 })
     const scored = await (await call({ a: 'load' }, cookie1)).json()
     assert.deepEqual(scored.questScores, { p1: 0, p2: 1 })
-    assert.deepEqual(JSON.parse(scored.sheets.projects.find((row: string[]) => row[0] === 'shared')[5]), {
-      status: 'done', createdBy: 'p1', visibility: 'household', completedBy: 'p2',
+    const sharedMetadata = JSON.parse(scored.sheets.projects.find((row: string[]) => row[0] === 'shared')[5])
+    assert.deepEqual({ ...sharedMetadata, completedAt: undefined }, {
+      status: 'done', createdBy: 'p1', visibility: 'household', completedBy: 'p2', completedAt: undefined,
     })
+    assert.match(sharedMetadata.completedAt, /^\d{4}-\d{2}-\d{2}T/)
+    const projectCompletions = await db.execute("SELECT data FROM records WHERE collection = 'project_completions'")
+    assert.equal(projectCompletions.rows.length, 1)
+    assert.equal(JSON.parse(String(projectCompletions.rows[0].data)).member, 'p2')
 
     const routine = {
       a: 'put', t: 'routines', id: 'dishes', revision: 0, operationId: randomUUID(),

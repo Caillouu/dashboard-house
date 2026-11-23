@@ -4,8 +4,13 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "regions": ["cdg1"],
-  "functions": {
-    "api/dashboard.ts": { "includeFiles": "{server,shared}/**/*.ts" }
+  "schedules": {
+    "daily-notifications": {
+      "schedule": "0 9 * * *",
+      "timezone": "Europe/Paris",
+      "path": "/api/notifications",
+      "requestMethod": "POST"
+    }
   },
   "headers": [
     { "source": "/(.*)", "headers": [

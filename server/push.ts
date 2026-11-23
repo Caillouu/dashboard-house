@@ -6,7 +6,7 @@ export const TEST_NOTIFICATION = "Ceci est un test pour te dire que je t'aime"
 
 const initialized = new WeakSet<Client>()
 
-async function ensurePushSubscriptions(db: Client) {
+export async function ensurePushSubscriptions(db: Client) {
   if (initialized.has(db)) return
   await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -18,6 +18,27 @@ async function ensurePushSubscriptions(db: Client) {
     CREATE INDEX IF NOT EXISTS push_subscriptions_member ON push_subscriptions(member);
   `)
   initialized.add(db)
+}
+
+type NotificationPayload = { title: string; body: string; url?: string; tag?: string }
+
+function errorDetails(error: unknown, endpoint: string) {
+  const details = typeof error === 'object' && error ? error as {
+    statusCode?: unknown
+    body?: unknown
+    endpoint?: unknown
+  } : {}
+  let endpointHost = 'unknown'
+  try { endpointHost = new URL(String(details.endpoint || endpoint)).hostname } catch {}
+  return {
+    statusCode: Number(details.statusCode) || 0,
+    endpointHost,
+    body: String(details.body || '').slice(0, 500),
+  }
+}
+
+async function send(subscription: PushSubscription, payload: NotificationPayload) {
+  return webpush.sendNotification(subscription, JSON.stringify({ url: '/', ...payload }), { TTL: 86400 })
 }
 
 function vapid(env: NodeJS.ProcessEnv) {
@@ -51,26 +72,36 @@ export async function subscribeAndSendTest(db: Client, member: Member, subscript
     args: [subscription.endpoint, member, JSON.stringify(subscription)],
   })
   try {
-    await webpush.sendNotification(subscription, JSON.stringify({
+    await send(subscription, {
       title: 'Maison', body: TEST_NOTIFICATION, url: '/', tag: 'notification-test',
-    }))
+    })
     return { testSent: true }
   } catch (error) {
-    const details = typeof error === 'object' && error ? error as {
-      statusCode?: unknown
-      body?: unknown
-      endpoint?: unknown
-    } : {}
-    let endpointHost = 'unknown'
-    try { endpointHost = new URL(String(details.endpoint || subscription.endpoint)).hostname } catch {}
-    console.error('Web push rejected', {
-      statusCode: Number(details.statusCode) || 0,
-      endpointHost,
-      body: String(details.body || '').slice(0, 500),
-    })
+    console.error('Web push rejected', errorDetails(error, subscription.endpoint))
     await unsubscribe(db, subscription.endpoint, member)
     throw error
   }
+}
+
+export async function sendMemberNotification(db: Client, member: Member, payload: NotificationPayload, env: NodeJS.ProcessEnv) {
+  vapid(env)
+  await ensurePushSubscriptions(db)
+  const { rows } = await db.execute({
+    sql: 'SELECT endpoint, subscription FROM push_subscriptions WHERE member = ?', args: [member],
+  })
+  let sent = 0
+  for (const row of rows) {
+    const endpoint = String(row.endpoint)
+    try {
+      await send(JSON.parse(String(row.subscription)) as PushSubscription, payload)
+      sent++
+    } catch (error) {
+      const details = errorDetails(error, endpoint)
+      console.error('Scheduled web push rejected', details)
+      if (details.statusCode === 404 || details.statusCode === 410) await unsubscribe(db, endpoint, member)
+    }
+  }
+  return sent
 }
 
 export async function unsubscribe(db: Client, endpoint: string, member: Member) {
