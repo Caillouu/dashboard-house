@@ -1,7 +1,7 @@
 import type { Client } from '@libsql/client'
 import { request } from '../shared/protocol.ts'
 import { charlieSkillAuthorized, clearSession, login, user } from './auth.ts'
-import { agenda, createAgendaEvent, deleteAgendaEvent, searchAgenda, weather } from './integrations.ts'
+import { agenda, createAgendaEvent, deleteAgendaEvent, renameAgendaEvent, searchAgenda, weather } from './integrations.ts'
 import { pushPublicKey, subscribeAndSendTest, unsubscribe } from './push.ts'
 import { addCharlieRecommendations, applyMutation, setRentReceiptStatus, snapshot } from './store.ts'
 
@@ -46,6 +46,7 @@ export async function dashboard(req: Request, getDb: () => Client, env: NodeJS.P
       case 'agendaSearch': return reply({ ok: true, ...await searchAgenda(env, op.from, op.to) })
       case 'agendaCreate': return reply({ ok: true, ...await createAgendaEvent(env, op.calendarId, op.title, op.start, op.end, op.allDay) })
       case 'agendaDelete': await deleteAgendaEvent(env, op.sources); return reply({ ok: true })
+      case 'agendaRename': await renameAgendaEvent(env, op.sources, op.title); return reply({ ok: true })
       case 'weather': return reply({ ok: true, weather: await weather(env) })
       case 'pushPublicKey': return reply({ ok: true, publicKey: pushPublicKey(env) })
       case 'pushSubscribe': return reply({ ok: true, ...await subscribeAndSendTest(getDb(), member, op.subscription, env) })

@@ -192,6 +192,22 @@ export async function deleteAgendaEvent(env: NodeJS.ProcessEnv, sources: { calen
   calendarCache.until = 0
 }
 
+export async function renameAgendaEvent(env: NodeJS.ProcessEnv, sources: { calendarId: string; eventId: string }[], title: string) {
+  const ids = calendarIds(env)
+  const token = await googleAccessToken(env)
+  await Promise.all(sources.map(async source => {
+    const rawCalendarId = ids.find(id => hash(id) === source.calendarId)
+    if (!rawCalendarId) throw new Error('Unknown configured Google calendar')
+    const url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(rawCalendarId) + '/events/' + encodeURIComponent(source.eventId)
+    await json<GoogleEvent>(url, {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary: title }),
+    })
+  }))
+  calendarCache.until = 0
+}
+
 type Forecast = {
   hourly: { time: string[]; temperature_2m: number[]; weather_code: number[]; is_day: number[] }
   daily: { time: string[]; temperature_2m_min: number[]; temperature_2m_max: number[]; weather_code: number[] }
