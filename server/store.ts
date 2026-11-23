@@ -80,6 +80,8 @@ export async function applyMutation(db: Client, op: Mutation, member: Member) {
   let value = op.a === 'put' ? op.row : op.a === 'setting' ? op.value : null
   let routineCompletion: { routineId: string; completedDate: string } | null = null
   let routineUndo: { routineId: string; completedDate: string } | null = null
+  let projectCompletion: { projectId: string; completedDate: string } | null = null
+  let projectUndo: { projectId: string } | null = null
   if (op.a === 'put' && op.t === 'routines') {
     const previous = await db.execute({ sql: "SELECT data FROM records WHERE collection = 'routines' AND id = ?", args: [op.id] })
     const previousValue = previous.rows[0]?.data ? JSON.parse(String(previous.rows[0].data)) : null
@@ -109,8 +111,18 @@ export async function applyMutation(db: Client, op: Mutation, member: Member) {
     }
     const wasDone = projectDone(previousValue, previousMetadata)
     const isDone = projectDone(op.row, metadata)
-    if (isDone && !wasDone) metadata.completedBy = member
-    if (!isDone) delete metadata.completedBy
+    if (isDone && !wasDone) {
+      metadata.completedBy = member
+      metadata.completedAt = new Date().toISOString()
+      if (metadata.visibility !== 'private') {
+        projectCompletion = { projectId: op.id, completedDate: String(metadata.completedAt).slice(0, 10) }
+      }
+    }
+    if (!isDone) {
+      delete metadata.completedBy
+      delete metadata.completedAt
+      if (wasDone && previousMetadata.visibility !== 'private') projectUndo = { projectId: op.id }
+    }
     value = [...op.row.slice(0, 5), JSON.stringify(metadata)]
   }
   if (op.a === 'del' && op.t === 'projects') {
@@ -139,6 +151,19 @@ export async function applyMutation(db: Client, op: Mutation, member: Member) {
       ORDER BY rowid DESC LIMIT 1
     ) AND EXISTS (SELECT 1 FROM mutations WHERE id = ? AND applied = 1)`,
     args: [routineUndo.routineId, routineUndo.completedDate, op.operationId],
+  })
+  if (projectCompletion) statements.push({
+    sql: `INSERT INTO records (collection, id, data, revision)
+      SELECT 'project_completions', ?, ?, 1
+      WHERE EXISTS (SELECT 1 FROM mutations WHERE id = ? AND applied = 1)`,
+    args: [op.operationId, JSON.stringify({ ...projectCompletion, member }), op.operationId],
+  })
+  if (projectUndo) statements.push({
+    sql: `DELETE FROM records WHERE collection = 'project_completions' AND id = (
+      SELECT id FROM records WHERE collection = 'project_completions'
+      AND json_extract(data, '$.projectId') = ? ORDER BY rowid DESC LIMIT 1
+    ) AND EXISTS (SELECT 1 FROM mutations WHERE id = ? AND applied = 1)`,
+    args: [projectUndo.projectId, op.operationId],
   })
   statements.push({ sql: 'SELECT * FROM mutations WHERE id = ?', args: [op.operationId] })
   const results = await db.batch(statements, 'write')

@@ -58,6 +58,13 @@ Voir [la documentation Google sur les jetons de renouvellement](https://develope
 
 Génère une seule paire de clés avec `npx web-push generate-vapid-keys`, puis configure les trois variables `VAPID_*` dans Vercel et redéploie. La table Turso est créée au premier abonnement ; la migration versionnée garantit ensuite le même schéma dans tous les environnements. Sur Android, installe la PWA avec Chrome. Sur iPhone ou iPad, ajoute-la à l’écran d’accueil. Une fois connecté, touche la cloche dans l’en-tête et accepte l’autorisation système. Le téléphone est enregistré dans Turso et reçoit immédiatement la notification de test. La même cloche permet de désabonner uniquement cet appareil.
 
+Le planning Vercel appelle `/api/notifications` chaque jour à 9 h, heure de Paris. La route exige `CRON_SECRET`, généré avec `openssl rand -hex 32`. Deux automatismes sont exécutés de façon rejouable, sans doublon :
+
+- lorsqu’un solde de dettes reste ouvert quinze jours après la plus ancienne dette, seul le membre débiteur reçoit un rappel quotidien avec le montant dû et le nom du créancier ; les rappels cessent dès que le solde revient à zéro ;
+- le premier jour du mois, les deux membres reçoivent le bilan du mois précédent. Il additionne les routines et les quêtes partagées terminées, exclut les quêtes privées et annonce le gagnant, son total et sa part du total. Les égalités et les mois sans activité ont un message dédié.
+
+Chaque personne doit activer la cloche sur au moins un de ses appareils pour recevoir les notifications qui lui sont destinées.
+
 ## Skill mensuel Charlie
 
 Le skill mensuel appelle le même point d’entrée que l’application, `POST /api/dashboard`, sans cookie utilisateur. Il s’authentifie avec `Authorization: Bearer <CHARLIE_SKILL_SECRET>` et envoie un corps JSON de cette forme :
