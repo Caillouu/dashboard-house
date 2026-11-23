@@ -49,6 +49,10 @@ export const request = z.union([
     start: z.string().regex(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/),
     end: z.string().regex(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/),
   }).refine(value => value.start < value.end),
+  z.object({
+    a: z.literal('agendaDelete'),
+    sources: z.array(z.object({ calendarId: id, eventId: z.string().min(1).max(1024) })).min(1).max(10),
+  }),
   charlieRecommendations,
   rentReceiptStatus,
   mutation,
@@ -60,6 +64,7 @@ export type CalendarEvent = {
   summary: string
   start: { date: string } | { dateTime: string }
   calendars: string[]
+  sources?: { calendarId: string; eventId: string }[]
 }
 export type Agenda = { events: CalendarEvent[]; calendars: { id: string; name: string }[] }
 export type Snapshot = {

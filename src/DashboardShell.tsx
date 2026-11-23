@@ -81,6 +81,16 @@ export function DashboardShell() {
     <button className="mini confirm-delete" type="button" data-act="debts-clear-confirm">Effacer</button>
   </div>
 </dialog>
+<dialog id="agenda-delete-dialog" className="confirm-dialog" aria-labelledby="agenda-delete-title" aria-describedby="agenda-delete-description">
+  <div className="confirm-dialog-head">
+    <span className="confirm-dialog-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 12h8l1-12M10 11v5M14 11v5" /></svg></span>
+    <div><h2 id="agenda-delete-title">Supprimer cet événement ?</h2><p id="agenda-delete-description">Il sera définitivement supprimé de Google Agenda.</p></div>
+  </div>
+  <div className="confirm-dialog-actions">
+    <button className="mini confirm-cancel" type="button" data-act="ev-delete-cancel">Annuler</button>
+    <button className="mini confirm-delete" type="button" data-act="ev-delete-confirm">Supprimer</button>
+  </div>
+</dialog>
 <section id="cview" className="qview cview" hidden aria-label="Liste de courses">
   <div className="qv-in">
     <header className="qv-head">
