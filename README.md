@@ -56,7 +56,7 @@ Voir [la documentation Google sur les jetons de renouvellement](https://develope
 
 ## Notifications mobiles
 
-Génère une seule paire de clés avec `npx web-push generate-vapid-keys`, puis configure les trois variables `VAPID_*` dans Vercel et redéploie. Sur Android, installe la PWA avec Chrome. Sur iPhone ou iPad, ajoute-la à l’écran d’accueil. Une fois connecté, touche la cloche dans l’en-tête et accepte l’autorisation système. Le téléphone est enregistré dans Turso et reçoit immédiatement la notification de test. La même cloche permet de désabonner uniquement cet appareil.
+Génère une seule paire de clés avec `npx web-push generate-vapid-keys`, puis configure les trois variables `VAPID_*` dans Vercel et redéploie. La table Turso est créée au premier abonnement ; la migration versionnée garantit ensuite le même schéma dans tous les environnements. Sur Android, installe la PWA avec Chrome. Sur iPhone ou iPad, ajoute-la à l’écran d’accueil. Une fois connecté, touche la cloche dans l’en-tête et accepte l’autorisation système. Le téléphone est enregistré dans Turso et reçoit immédiatement la notification de test. La même cloche permet de désabonner uniquement cet appareil.
 
 ## Skill mensuel Charlie
 
