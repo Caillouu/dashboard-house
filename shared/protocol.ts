@@ -63,6 +63,7 @@ export type CalendarEvent = {
   id: string
   summary: string
   start: { date: string } | { dateTime: string }
+  end?: { date: string } | { dateTime: string }
   calendars: string[]
   sources?: { calendarId: string; eventId: string }[]
 }

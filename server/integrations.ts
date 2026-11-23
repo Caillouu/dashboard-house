@@ -28,6 +28,7 @@ type GoogleEvent = {
   summary?: string
   status?: string
   start?: { date?: string; dateTime?: string }
+  end?: { date?: string; dateTime?: string }
 }
 type CalendarPage = { summary?: string; nextPageToken?: string; items?: GoogleEvent[] }
 
@@ -66,7 +67,7 @@ async function readCalendar(id: string, index: number, token: string, timeMin: s
     singleEvents: 'true', orderBy: 'startTime', maxResults,
     timeMin, timeMax,
     timeZone: 'Europe/Paris',
-    fields: 'summary,items(id,iCalUID,summary,status,start)',
+    fields: 'summary,items(id,iCalUID,summary,status,start,end)',
   }).toString()
   const page = await json<CalendarPage>(url, { headers: { Authorization: 'Bearer ' + token } })
   return { id: hash(id), name: label(page.summary ?? '', index), items: page.items ?? [] }
@@ -100,7 +101,8 @@ export async function agenda(env: NodeJS.ProcessEnv) {
           if (!existing.calendars.includes(id)) existing.calendars.push(id)
           existing.sources?.push({ calendarId: id, eventId: item.id })
         } else {
-          events.set(key, { id: hash((item.iCalUID ?? item.id) + '|' + start), summary, start: date ? { date } : { dateTime: start }, calendars: [id], sources: [{ calendarId: id, eventId: item.id }] })
+          const end = item.end?.date ? { date: item.end.date } : item.end?.dateTime ? { dateTime: new Date(item.end.dateTime).toISOString() } : undefined
+          events.set(key, { id: hash((item.iCalUID ?? item.id) + '|' + start), summary, start: date ? { date } : { dateTime: start }, end, calendars: [id], sources: [{ calendarId: id, eventId: item.id }] })
         }
       }
     }
@@ -148,7 +150,8 @@ export async function searchAgenda(env: NodeJS.ProcessEnv, from: string, to: str
         if (!existing.calendars.includes(id)) existing.calendars.push(id)
         existing.sources?.push({ calendarId: id, eventId: item.id })
       } else {
-        events.set(key, { id: hash((item.iCalUID ?? item.id) + '|' + start), summary, start: date ? { date } : { dateTime: start }, calendars: [id], sources: [{ calendarId: id, eventId: item.id }] })
+        const end = item.end?.date ? { date: item.end.date } : item.end?.dateTime ? { dateTime: new Date(item.end.dateTime).toISOString() } : undefined
+        events.set(key, { id: hash((item.iCalUID ?? item.id) + '|' + start), summary, start: date ? { date } : { dateTime: start }, end, calendars: [id], sources: [{ calendarId: id, eventId: item.id }] })
       }
     }
   }
