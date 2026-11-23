@@ -56,6 +56,18 @@ export async function subscribeAndSendTest(db: Client, member: Member, subscript
     }))
     return { testSent: true }
   } catch (error) {
+    const details = typeof error === 'object' && error ? error as {
+      statusCode?: unknown
+      body?: unknown
+      endpoint?: unknown
+    } : {}
+    let endpointHost = 'unknown'
+    try { endpointHost = new URL(String(details.endpoint || subscription.endpoint)).hostname } catch {}
+    console.error('Web push rejected', {
+      statusCode: Number(details.statusCode) || 0,
+      endpointHost,
+      body: String(details.body || '').slice(0, 500),
+    })
     await unsubscribe(db, subscription.endpoint, member)
     throw error
   }
