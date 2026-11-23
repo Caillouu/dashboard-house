@@ -1124,7 +1124,15 @@ import { isDisplayableRecord } from './src/records.ts'
   function mapsUrl(q){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q)}
   /* Icône d'un voyage : le train par défaut (l'ancien avion par défaut devient un train) */
   function tEmo(t){return !t.emoji||t.emoji==='✈️'?'🚆':t.emoji}
-  function trips(){return S.voyages.filter(function(x){return x.type==='voyage'})}
+  function agendaTripDate(part,isEnd){
+    if(!part)return '';if(part.date){var date=part.date;if(isEnd){var d=parse(date);d.setDate(d.getDate()-1);date=iso(d)}return date}
+    var d2=new Date(part.dateTime);return isNaN(d2)?'':new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(d2)
+  }
+  function agendaTrips(){return cal.status==='ok'?cal.events.filter(function(event){var title=nrm(event.summary);return /(^|\s)(week[ -]?end|voyage)(\s|$)/.test(title)}).map(function(event){
+    var start=agendaTripDate(event.start,false),end=agendaTripDate(event.end,true)||start;
+    return {id:'agenda-'+event.id,type:'voyage',trip:'',title:eventTitle(event,'Voyage'),emoji:'🗓️',start:start,end:end,done:false,agenda:true}
+  }):[]}
+  function trips(){return S.voyages.filter(function(x){return x.type==='voyage'}).concat(agendaTrips())}
   function kids(tid,type){return S.voyages.filter(function(x){return x.trip===tid&&x.type!=='voyage'&&(!type||x.type===type)})}
   function byStart(a,b){var sk=function(v){return !v?'9999':v.length===10?v+' 99:99':v},x=sk(a.start),y=sk(b.start);if(x!==y)return x<y?-1:1;return (a.createdAt||0)-(b.createdAt||0)}
   function vEmoji(o){
@@ -1177,11 +1185,11 @@ import { isDisplayableRecord } from './src/records.ts'
     var up=all.filter(function(x){return x.st.k!=='past'}).sort(function(a,b){if(R[a.st.k]!==R[b.st.k])return R[a.st.k]-R[b.st.k];return a.st.sp.s<b.st.sp.s?-1:a.st.sp.s>b.st.sp.s?1:0});
     var past=all.filter(function(x){return x.st.k==='past'}).sort(function(a,b){return a.st.sp.s<b.st.sp.s?1:-1});
     var tile=function(x){var t=x.t,c=tripCounts(t);
-      return '<button class="ttile '+x.st.k+'" data-act="trip-open" data-id="'+esc(t.id)+'"><span class="tt-em" aria-hidden="true">'+esc(tEmo(t))+'</span>'+
+      return '<button class="ttile '+x.st.k+'" data-act="'+(t.agenda?'hub-go':'trip-open')+'" '+(t.agenda?'data-v="agenda"':'data-id="'+esc(t.id)+'"')+'><span class="tt-em" aria-hidden="true">'+esc(tEmo(t))+'</span>'+
         '<span class="tt-main"><span class="tt-t">'+esc(t.title)+'</span><span class="tt-d">'+esc(spanTxt(x.st.sp))+'</span>'+(c?'<span class="tt-c">'+esc(c)+'</span>':'')+'</span>'+
         '<span class="tt-b">'+esc(tripBadge(x.st))+'</span></button>'};
     var nt=nextTrip(),hero='';
-    if(nt){var hs=tripState(nt);hero='<button class="thero '+hs.k+'" data-act="trip-open" data-id="'+esc(nt.id)+'"><span class="th-k">'+(hs.k==='now'?'Voyage en cours':'Prochain départ')+'</span><span class="th-t">'+esc(tEmo(nt)+' '+nt.title)+'</span>'+countdownHtml(nt)+'</button>'}
+    if(nt){var hs=tripState(nt);hero='<button class="thero '+hs.k+'" data-act="'+(nt.agenda?'hub-go':'trip-open')+'" '+(nt.agenda?'data-v="agenda"':'data-id="'+esc(nt.id)+'"')+'><span class="th-k">'+(hs.k==='now'?'Voyage en cours':'Prochain départ')+'</span><span class="th-t">'+esc(tEmo(nt)+' '+nt.title)+'</span>'+countdownHtml(nt)+'</button>'}
     el.innerHTML=hero+(up.length?'<div class="trips">'+up.map(tile).join('')+'</div>':empty('voyages','Aucun voyage prévu.<br>Ajoute ton prochain départ avec « + Nouveau ».'))+
       (past.length?'<button type="button" class="lnk donetog" data-act="trips-past" aria-expanded="'+showPast+'">'+(showPast?'▾':'▸')+' Voyages passés ('+past.length+')</button>'+(showPast?'<div class="trips">'+past.map(tile).join('')+'</div>':''):'')}
 
