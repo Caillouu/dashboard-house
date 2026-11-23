@@ -46,9 +46,13 @@ export const request = z.union([
     a: z.literal('agendaCreate'),
     calendarId: id,
     title: z.string().trim().min(1).max(120),
-    start: z.string().regex(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/),
-    end: z.string().regex(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/),
-  }).refine(value => value.start < value.end),
+    start: z.string().max(16),
+    end: z.string().max(16),
+    allDay: z.boolean().optional().default(false),
+  }).refine(value => {
+    const pattern = value.allDay ? /^\d{4}-\d{2}-\d{2}$/ : /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/
+    return pattern.test(value.start) && pattern.test(value.end) && (value.allDay ? value.start <= value.end : value.start < value.end)
+  }),
   z.object({
     a: z.literal('agendaDelete'),
     sources: z.array(z.object({ calendarId: id, eventId: z.string().min(1).max(1024) })).min(1).max(10),

@@ -154,6 +154,11 @@ def main():
                     page.click('#ag-create-form [data-field="start"]')
                     assert page.locator('#ag-create-form [name="startHour"] option').count() == 24, 'heures de début'
                     assert page.locator('#ag-create-form [name="endMinute"] option').count() == 12, 'minutes de fin'
+                    page.click('#ag-create-form [data-act="ag-create-allday"]')
+                    assert page.locator('#ag-create-form [name="startHour"]').count() == 0, 'toute la journée masque les heures'
+                    assert page.get_attribute('#ag-create-form [data-act="ag-create-allday"]', 'aria-pressed') == 'true'
+                    page.click('#ag-create-form [data-act="ag-create-allday"]')
+                    assert page.locator('#ag-create-form [name="startHour"]').count() == 1, 'désactiver toute la journée réaffiche les heures'
                     page.click('#ag-create-form [data-days="2"]')
                     assert page.locator('#ag-create-form .ag-create-bound').count() == 2, 'début et fin sur deux lignes'
                     page.fill('#ag-create-form [name="title"]', 'Dentiste')
