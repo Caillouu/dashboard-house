@@ -677,7 +677,7 @@ import { isDisplayableRecord } from './src/records.ts'
     var calendars=cal.calendars||[],focused=document.activeElement,focusId=focused&&el.contains(focused)?focused.getAttribute('data-calendar'):null;
     var tones=new Map(calendars.map(function(c){return [c.id,agTone(c.name)]}));
     var filters=calendars.map(function(c){var on=!agHidden.has(c.id);return '<button type="button" class="ag-filter ag-tone-'+agTone(c.name)+'" data-act="ag-filter" data-calendar="'+esc(c.id)+'" aria-pressed="'+on+'" title="'+(on?'Masquer ':'Afficher ')+esc(c.name)+'">'+esc(c.name)+'</button>'}).join('');
-    if(cal.status==='ok')cal.events.forEach(function(e){if(!e||HID.indexOf(e.id)>=0||(e.calendars&&e.calendars.every(function(id){return agHidden.has(id)})))return;var i=evInfo(e);if(!i||i.n<0)return;if(i.n===0&&!i.allDay&&i.d<now&&now-i.d>3*36e5)return;
+    if(cal.status==='ok')cal.events.forEach(function(e){if(!e||isMultiDayAgendaTrip(e)||HID.indexOf(e.id)>=0||(e.calendars&&e.calendars.every(function(id){return agHidden.has(id)})))return;var i=evInfo(e);if(!i||i.n<0)return;if(i.n===0&&!i.allDay&&i.d<now&&now-i.d>3*36e5)return;
       var visibleCalendar=(e.calendars||[]).filter(function(id){return !agHidden.has(id)})[0];
       items.push({n:i.n,k:i.allDay?'':i.d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),t:eventTitle(e,'Sans titre'),id:e.id,type:'ev',tone:tones.get(visibleCalendar)||'other'})});
     trips().forEach(function(t){var sp=tripSpan(t);if(!sp.s)return;var a=diff(sp.s),b=sp.e?diff(sp.e):a;
@@ -1129,7 +1129,9 @@ import { isDisplayableRecord } from './src/records.ts'
     if(!part)return '';if(part.date){var date=part.date;if(isEnd){var d=parse(date);d.setDate(d.getDate()-1);date=iso(d)}return date}
     var d2=new Date(part.dateTime);return isNaN(d2)?'':new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(d2)
   }
-  function agendaTrips(){return cal.status==='ok'?cal.events.filter(function(event){var title=nrm(event.summary);return /(^|\s)(week[ -]?end|voyage)(\s|$)/.test(title)}).map(function(event){
+  function isAgendaTrip(event){var title=nrm(event&&event.summary);return /(^|\s)(week[ -]?end|voyage)(\s|$)/.test(title)}
+  function isMultiDayAgendaTrip(event){var start=agendaTripDate(event&&event.start,false),end=agendaTripDate(event&&event.end,true);return isAgendaTrip(event)&&start&&end>start}
+  function agendaTrips(){return cal.status==='ok'?cal.events.filter(isAgendaTrip).map(function(event){
     var start=agendaTripDate(event.start,false),end=agendaTripDate(event.end,true)||start;
     return {id:'agenda-'+event.id,type:'voyage',trip:'',title:eventTitle(event,'Voyage'),emoji:'🗓️',start:start,end:end,done:false,agenda:true}
   }):[]}
