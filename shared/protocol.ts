@@ -33,9 +33,20 @@ const rentReceiptStatus = z.object({
   month: z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/),
   status: z.enum(['not-generated', 'generated']),
 })
+const pushSubscription = z.object({
+  endpoint: z.url().max(2048),
+  expirationTime: z.number().nullable().optional(),
+  keys: z.object({
+    p256dh: z.string().min(20).max(256),
+    auth: z.string().min(8).max(256),
+  }),
+})
 export const request = z.union([
   z.object({ a: z.literal('login'), member: z.enum(['p1', 'p2']), code: z.string().min(1).max(200) }),
   z.object({ a: z.enum(['load', 'logout', 'agenda', 'weather']) }),
+  z.object({ a: z.literal('pushPublicKey') }),
+  z.object({ a: z.literal('pushSubscribe'), subscription: pushSubscription }),
+  z.object({ a: z.literal('pushUnsubscribe'), endpoint: z.url().max(2048) }),
   z.object({
     a: z.literal('agendaSearch'),
     from: z.iso.date(),

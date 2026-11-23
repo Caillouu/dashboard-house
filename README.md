@@ -38,6 +38,7 @@ npm run build
 | `CHARLIE_SKILL_SECRET` | Secret aléatoire d’au moins 32 caractères partagé uniquement avec le skill mensuel Charlie |
 | `PERSON_1` et `PERSON_2` | Prénoms facultatifs qui s’affichent dans la wishlist |
 | `WEATHER_LAT`, `WEATHER_LON` et `WEATHER_CITY` | Localisation facultative de la première carte météo, Paris par défaut |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` et `VAPID_SUBJECT` | Clés Web Push générées avec `npx web-push generate-vapid-keys` et contact `mailto:` du responsable |
 
 5. Redéploie, connecte les deux membres, puis installe la PWA depuis sa nouvelle adresse HTTPS. L’application démarre avec une base vide. Les données de l’ancien Sheet restent dans le Sheet. Si tu veux continuer à utiliser GitHub Pages pendant l’essai, garde son déploiement sur une révision d’avant la migration.
 
@@ -52,6 +53,10 @@ L’agenda est facultatif. Dans Google Cloud, active l’API Google Calendar et 
 3. Dans Vercel, ajoute `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` et `CALENDAR_IDS`. Sépare les identifiants des agendas par des virgules. Redéploie le projet. Vérifie l’onglet Agenda et les filtres, puis les logs Vercel si un agenda manque.
 
 Voir [la documentation Google sur les jetons de renouvellement](https://developers.google.com/identity/protocols/oauth2#expiration).
+
+## Notifications mobiles
+
+Génère une seule paire de clés avec `npx web-push generate-vapid-keys`, puis configure les trois variables `VAPID_*` dans Vercel et redéploie. Sur Android, installe la PWA avec Chrome. Sur iPhone ou iPad, ajoute-la à l’écran d’accueil. Une fois connecté, touche la cloche dans l’en-tête et accepte l’autorisation système. Le téléphone est enregistré dans Turso et reçoit immédiatement la notification de test. La même cloche permet de désabonner uniquement cet appareil.
 
 ## Skill mensuel Charlie
 

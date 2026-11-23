@@ -13,3 +13,12 @@
 #sync-controls button {
   margin: 0.25rem;
 }
+.push-control{position:relative;display:grid;place-items:center}
+.push-button{display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:var(--o-bg);color:var(--o-ink);cursor:pointer}
+.push-button:hover{filter:brightness(.98)}
+.push-button:focus-visible{outline:3px solid var(--lav);outline-offset:2px}
+.push-button:disabled{cursor:wait;opacity:.6}
+.push-button.active{background:var(--m-bg);color:var(--m-ink)}
+.push-button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.push-message{position:absolute;z-index:10;top:42px;right:0;width:min(280px,calc(100vw - 32px));padding:9px 12px;border-radius:12px;background:#fff;color:var(--ink);box-shadow:0 8px 24px rgba(60,40,140,.16);font-size:12px;font-weight:800}
+.push-message.error{color:#9E2F29}
