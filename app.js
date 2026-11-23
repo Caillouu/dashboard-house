@@ -428,7 +428,7 @@ import { isDisplayableRecord } from './src/records.ts'
       iconField(grpEdit.emoji,'data-grp="name"',grpEdit.name,'Vélo, Voiture, Potager…','data-act="grp-emo"',GEMO,grpEdit.emoji)+
       '<div class="prow">'+(grpEdit.id==='new'?'':'<button class="lnk del" data-act="grp-del">Supprimer</button>')+'<button class="btn valid" data-act="grp-save">Valider</button></div></div></div>';
       sh.hidden=false;var gqi=sh.querySelector('[data-grp]');if(gqi&&grpEdit.id==='new')gqi.focus();return}
-    if(evEdit){sh.innerHTML='<div class="sheet-bg" data-act="sheet-close"></div><div class="sheet-card" role="dialog" aria-modal="true" aria-label="Renommer"><button class="sheet-x" data-act="sheet-close" aria-label="Fermer">×</button><div class="panel"><div class="pj-title">Renommer l\'événement</div><div class="lab">Nom affiché</div><input class="in" maxlength="80" data-evn value="'+esc(evEdit.v)+'" aria-label="Nom affiché"><div class="hint">Nom d\'origine : '+esc(evEdit.orig)+'<br>Le changement ne modifie que le dashboard, pas Google Agenda.</div><div class="prow"><button class="lnk" data-act="ev-reset">Nom d\'origine</button><button class="btn valid" data-act="ev-save">Valider</button></div></div></div>';sh.hidden=false;var ei=sh.querySelector('[data-evn]');if(ei){ei.focus();ei.select()}return}
+    if(evEdit){sh.innerHTML='<div class="sheet-bg" data-act="sheet-close"></div><div class="sheet-card" role="dialog" aria-modal="true" aria-label="Renommer"><button class="sheet-x" data-act="sheet-close" aria-label="Fermer">×</button><div class="panel"><div class="pj-title">Renommer l\'événement</div><div class="lab">Nom de l’événement</div><input class="in" maxlength="120" data-evn value="'+esc(evEdit.v)+'" aria-label="Nom de l’événement">'+(evEdit.error?'<p class="ag-create-error" role="alert">'+esc(evEdit.error)+'</p>':'')+'<div class="prow"><button class="btn valid" data-act="ev-save"'+(evEdit.status==='loading'?' disabled':'')+'>'+(evEdit.status==='loading'?'Enregistrement…':'Valider')+'</button></div></div></div>';sh.hidden=false;var ei=sh.querySelector('[data-evn]');if(ei&&evEdit.status!=='loading'){ei.focus();ei.select()}return}
     if(agOpen&&!evEdit){sh.innerHTML='<div class="sheet-bg" data-act="sheet-close"></div><div class="sheet-card wide" role="dialog" aria-modal="true" aria-label="Agenda"><button class="sheet-x" data-act="sheet-close" aria-label="Fermer">×</button>'+agendaPanel()+'</div>';sh.hidden=false;return}
     if(bilPop){sh.innerHTML='<div class="sheet-bg" data-act="sheet-close"></div><div class="sheet-card" role="dialog" aria-modal="true" aria-label="Billets"><button class="sheet-x" data-act="sheet-close" aria-label="Fermer">×</button>'+bilPanel()+'</div>';sh.hidden=false;return}
     if(tplMgr||tplEdit){sh.innerHTML='<div class="sheet-bg" data-act="sheet-close"></div><div class="sheet-card wide" role="dialog" aria-modal="true" aria-label="Listes types"><button class="sheet-x" data-act="sheet-close" aria-label="Fermer">×</button>'+tplPanel()+'</div>';sh.hidden=false;return}
@@ -1508,7 +1508,14 @@ import { isDisplayableRecord } from './src/records.ts'
   }
   var calRange=lsGet('maison-cal-range')||'week',HID=[],showHid=false,EVN={},evEdit=null;
   function hideBtn(id,on){return '<button class="evx" data-act="ev-hide" data-id="'+esc(id)+'" aria-label="'+(on?'Réafficher':'Masquer')+'" title="'+(on?'Réafficher':'Masquer')+'">'+(on?UNDO:'×')+'</button>'}
-  function evSave(reset){if(!evEdit)return;var v=String(evEdit.v||'').trim().slice(0,80);if(reset||!v||v===evEdit.orig)delete EVN[evEdit.id];else EVN[evEdit.id]=v;saveSetting('eventNames',EVN);evEdit=null;renderSheet();renderCal();renderAgenda();renderHub()}
+  function evSave(){
+    if(!evEdit||evEdit.status==='loading')return;var edit=evEdit,v=String(edit.v||'').trim().slice(0,120);if(!v)return;
+    if(v===edit.event.summary){evEdit=null;renderSheet();return}
+    edit.status='loading';edit.error='';renderSheet();
+    api('agendaRename',{sources:edit.event.sources,title:v}).then(function(){
+      edit.event.summary=v;delete EVN[edit.id];saveSetting('eventNames',EVN);evEdit=null;renderSheet();renderCal();renderAgenda();renderHub();toastMsg('Événement renommé dans Google Agenda ✓');integrationAt=0;refreshIntegrations(true)
+    }).catch(function(error){if(authFail(error))return;edit.status='idle';edit.error='Le nom n’a pas pu être modifié dans Google Agenda.';evEdit=edit;renderSheet()})
+  }
   function setHid(list){HID=list;saveSetting('hiddenEvents',list);renderCal();renderAgenda();renderHub()}
   var agendaDeleteId=null;
   function openAgendaDelete(id){
@@ -1739,9 +1746,8 @@ import { isDisplayableRecord } from './src/records.ts'
     else if(a==='add-toggle'){var fa=$('f-add');fa.hidden=!fa.hidden;if(!fa.hidden)$('a-title').focus()}
     else if(a==='sd'){it=find('projects',id);if(it){var i2=Number(b.getAttribute('data-i'));var st2=steps(it);st2.splice(i2,1);upd('projects',id,{steps:st2})}}
     else if(a==='cal-go'){load()}
-    else if(a==='ev-edit'){var ee=cal.events.filter(function(q){return q.id===id})[0];if(ee){evEdit={id:id,orig:ee.summary||'Sans titre',v:EVN[id]||ee.summary||''};projId=null;openId=null;wishOpen=null;renderSheet()}}
+    else if(a==='ev-edit'){var ee=cal.events.filter(function(q){return q.id===id})[0];if(ee&&ee.sources&&ee.sources.length){evEdit={id:id,event:ee,v:EVN[id]||ee.summary||'',status:'idle',error:''};projId=null;openId=null;wishOpen=null;renderSheet()}}
     else if(a==='ev-save'){evSave(false)}
-    else if(a==='ev-reset'){evSave(true)}
     else if(a==='ev-delete'){openAgendaDelete(id)}
     else if(a==='ev-delete-cancel'){closeAgendaDelete()}
     else if(a==='ev-delete-confirm'){confirmAgendaDelete()}

@@ -68,6 +68,11 @@ export const request = z.union([
     a: z.literal('agendaDelete'),
     sources: z.array(z.object({ calendarId: id, eventId: z.string().min(1).max(1024) })).min(1).max(10),
   }),
+  z.object({
+    a: z.literal('agendaRename'),
+    sources: z.array(z.object({ calendarId: id, eventId: z.string().min(1).max(1024) })).min(1).max(10),
+    title: z.string().trim().min(1).max(120),
+  }),
   charlieRecommendations,
   rentReceiptStatus,
   mutation,

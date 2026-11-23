@@ -179,6 +179,8 @@ test('sessions, household state, repeated requests, and stale offline edits', as
     assert.equal((await call({ a: 'agendaCreate', calendarId: 'calendar-1', title: '', start: '2027-01-14T10:00', end: '2027-01-14T11:00' }, cookie1)).status, 400)
     assert.equal((await call({ a: 'agendaCreate', calendarId: 'calendar-1', title: 'Vacances', start: '2027-01-15', end: '2027-01-14', allDay: true }, cookie1)).status, 400)
     assert.equal((await call({ a: 'agendaCreate', calendarId: 'calendar-1', title: 'Vacances', start: '2027-01-14T10:00', end: '2027-01-14T11:00', allDay: true }, cookie1)).status, 400)
+    assert.equal((await call({ a: 'agendaRename', sources: [], title: 'Nouveau nom' }, cookie1)).status, 400)
+    assert.equal((await call({ a: 'agendaRename', sources: [{ calendarId: 'calendar-1', eventId: 'event-1' }], title: '' }, cookie1)).status, 400)
     assert.match((await call({ a: 'logout' }, cookie1)).headers.get('set-cookie')!, /Max-Age=0/)
   } finally {
     db.close()
