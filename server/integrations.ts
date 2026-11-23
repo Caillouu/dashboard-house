@@ -160,18 +160,19 @@ export async function searchAgenda(env: NodeJS.ProcessEnv, from: string, to: str
   return { calendars, events: [...events.values()].sort((a, b) => sortKey(a).localeCompare(sortKey(b))) }
 }
 
-export async function createAgendaEvent(env: NodeJS.ProcessEnv, calendarId: string, title: string, start: string, end: string) {
+export async function createAgendaEvent(env: NodeJS.ProcessEnv, calendarId: string, title: string, start: string, end: string, allDay = false) {
   const rawId = calendarIds(env).find(id => hash(id) === calendarId)
   if (!rawId) throw new Error('Unknown configured Google calendar')
   const token = await googleAccessToken(env)
   const url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(rawId) + '/events'
+  const nextDay = (date: string) => new Date(Date.parse(date + 'T00:00:00Z') + 864e5).toISOString().slice(0, 10)
   const event = await json<GoogleEvent>(url, {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       summary: title,
-      start: { dateTime: start + ':00', timeZone: 'Europe/Paris' },
-      end: { dateTime: end + ':00', timeZone: 'Europe/Paris' },
+      start: allDay ? { date: start } : { dateTime: start + ':00', timeZone: 'Europe/Paris' },
+      end: allDay ? { date: nextDay(end) } : { dateTime: end + ':00', timeZone: 'Europe/Paris' },
     }),
   })
   calendarCache.until = 0

@@ -43,7 +43,7 @@ export async function dashboard(req: Request, getDb: () => Client, env: NodeJS.P
       case 'load': return reply({ ok: true, member, ...await snapshot(getDb(), env, member) })
       case 'agenda': return reply({ ok: true, ...await agenda(env) })
       case 'agendaSearch': return reply({ ok: true, ...await searchAgenda(env, op.from, op.to) })
-      case 'agendaCreate': return reply({ ok: true, ...await createAgendaEvent(env, op.calendarId, op.title, op.start, op.end) })
+      case 'agendaCreate': return reply({ ok: true, ...await createAgendaEvent(env, op.calendarId, op.title, op.start, op.end, op.allDay) })
       case 'agendaDelete': await deleteAgendaEvent(env, op.sources); return reply({ ok: true })
       case 'weather': return reply({ ok: true, weather: await weather(env) })
       case 'put':

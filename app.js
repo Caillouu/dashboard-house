@@ -618,7 +618,7 @@ import { isDisplayableRecord } from './src/records.ts'
   /* ---- Onglet Agenda : ce qui va se passer dans les prochains jours et semaines ---- */
   var agSel=null,agHidden=new Set(),agSearchSeq=0;
   var agSearch={open:false,month:new Date(new Date().getFullYear(),new Date().getMonth(),1),from:'',to:'',status:'idle',events:[],calendars:[]};
-  var agCreate={open:false,status:'idle',error:'',dateField:'',month:new Date(new Date().getFullYear(),new Date().getMonth(),1),title:'',calendarId:'',start:'',end:'',startHour:'',startMinute:'',endHour:'',endMinute:''};
+  var agCreate={open:false,status:'idle',error:'',dateField:'',month:new Date(new Date().getFullYear(),new Date().getMonth(),1),title:'',calendarId:'',start:'',end:'',allDay:false,startHour:'',startMinute:'',endHour:'',endMinute:''};
   function agTone(name){var n=nrm(name);return n.indexOf('jupiter')>=0?'jupiter':n.indexOf('pierre')>=0?'pierre':n.indexOf('perso')>=0?'perso':'other'}
   function agSearchLabel(){
     if(!agSearch.from)return 'Choisis une date ou une période';
@@ -657,7 +657,7 @@ import { isDisplayableRecord } from './src/records.ts'
   }
   function resetAgCreate(){
     var now=new Date();now.setSeconds(0,0);now.setMinutes(Math.ceil(now.getMinutes()/5)*5);var later=new Date(now.getTime()+36e5);
-    agCreate.status='idle';agCreate.error='';agCreate.dateField='';agCreate.month=new Date(now.getFullYear(),now.getMonth(),1);agCreate.title='';agCreate.calendarId=(cal.calendars&&cal.calendars[0]||{}).id||'';agCreate.start=iso(now);agCreate.end=iso(later);agCreate.startHour=pad(now.getHours());agCreate.startMinute=pad(now.getMinutes());agCreate.endHour=pad(later.getHours());agCreate.endMinute=pad(later.getMinutes());
+    agCreate.status='idle';agCreate.error='';agCreate.dateField='';agCreate.month=new Date(now.getFullYear(),now.getMonth(),1);agCreate.title='';agCreate.calendarId=(cal.calendars&&cal.calendars[0]||{}).id||'';agCreate.start=iso(now);agCreate.end=iso(later);agCreate.allDay=false;agCreate.startHour=pad(now.getHours());agCreate.startMinute=pad(now.getMinutes());agCreate.endHour=pad(later.getHours());agCreate.endMinute=pad(later.getMinutes());
   }
   function agCreateDateLabel(date){return date?cap(fmtDay(date,{weekday:'short',day:'numeric',month:'long'})):'Choisir une date'}
   function agCreatePanel(){
@@ -666,7 +666,8 @@ import { isDisplayableRecord } from './src/records.ts'
     return '<section class="ag-search-panel ag-create-panel" aria-label="Ajouter un événement"><div class="ag-search-panel-head"><div><b>Ajouter un événement</b><span>Dans le Google Agenda de ton choix</span></div><button type="button" class="ag-search-close" data-act="ag-create-close" aria-label="Fermer l’ajout">×</button></div><form id="ag-create-form" class="ag-create-form">'+
       '<label class="ag-create-field"><span>Titre de l’événement</span><input name="title" data-ag-create="title" value="'+esc(agCreate.title)+'" maxlength="120" required autocomplete="off" placeholder="Ex. Rendez-vous vétérinaire"></label>'+
       '<fieldset class="ag-create-calendars"><legend>Google Agenda</legend><div>'+choices+'</div></fieldset>'+
-      '<div class="ag-create-dates"><section class="ag-create-bound"><b>Début</b><button type="button" class="ag-create-date" data-act="ag-create-date-toggle" data-field="start" aria-label="Date de début" aria-expanded="'+(agCreate.dateField==='start')+'"><strong>'+esc(agCreateDateLabel(agCreate.start))+'</strong></button>'+agTimeSelect('start',agCreate.startHour+':'+agCreate.startMinute)+'</section><section class="ag-create-bound"><b>Fin</b><div class="ag-create-date-wrap"><button type="button" class="ag-create-date" data-act="ag-create-date-toggle" data-field="end" aria-label="Date de fin" aria-expanded="'+(agCreate.dateField==='end')+'"><strong>'+esc(agCreateDateLabel(agCreate.end))+'</strong></button><div class="ag-create-shortcuts" aria-label="Raccourcis de date de fin"><button type="button" data-act="ag-create-duration" data-days="1">1J</button><button type="button" data-act="ag-create-duration" data-days="2">2J</button><button type="button" data-act="ag-create-duration" data-days="3">3J</button></div></div>'+agTimeSelect('end',agCreate.endHour+':'+agCreate.endMinute)+'</section></div>'+
+      '<button type="button" class="ag-create-allday" data-act="ag-create-allday" aria-pressed="'+agCreate.allDay+'"><span aria-hidden="true"></span>Toute la journée</button>'+
+      '<div class="ag-create-dates"><section class="ag-create-bound"><b>Début</b><button type="button" class="ag-create-date" data-act="ag-create-date-toggle" data-field="start" aria-label="Date de début" aria-expanded="'+(agCreate.dateField==='start')+'"><strong>'+esc(agCreateDateLabel(agCreate.start))+'</strong></button>'+(agCreate.allDay?'':agTimeSelect('start',agCreate.startHour+':'+agCreate.startMinute))+'</section><section class="ag-create-bound"><b>Fin</b><div class="ag-create-date-wrap"><button type="button" class="ag-create-date" data-act="ag-create-date-toggle" data-field="end" aria-label="Date de fin" aria-expanded="'+(agCreate.dateField==='end')+'"><strong>'+esc(agCreateDateLabel(agCreate.end))+'</strong></button><div class="ag-create-shortcuts" aria-label="Raccourcis de date de fin"><button type="button" data-act="ag-create-duration" data-days="1">1J</button><button type="button" data-act="ag-create-duration" data-days="2">2J</button><button type="button" data-act="ag-create-duration" data-days="3">3J</button></div></div>'+(agCreate.allDay?'':agTimeSelect('end',agCreate.endHour+':'+agCreate.endMinute))+'</section></div>'+
       (agCreate.dateField?rangeCal(agCreate.dateField==='start'?agCreate.start:agCreate.end,'',agCreate.month,'ag-create-date',''):'')+
       (agCreate.error?'<p class="ag-create-error" role="alert">'+esc(agCreate.error)+'</p>':'')+
       '<button type="submit" class="btn ag-search-submit"'+(agCreate.status==='loading'?' disabled':'')+'>'+(agCreate.status==='loading'?'<span class="ag-spinner" aria-hidden="true"></span>Ajout en cours…':'Ajouter l’événement')+'</button></form></section>';
@@ -1720,7 +1721,8 @@ import { isDisplayableRecord } from './src/records.ts'
     else if(a==='ag-create-date-next'){agCreate.month=new Date(agCreate.month.getFullYear(),agCreate.month.getMonth()+1,1);renderAgenda()}
     else if(a==='ag-create-date-toggle'){var field=b.getAttribute('data-field');agCreate.dateField=agCreate.dateField===field?'':field;var chosen=parse(agCreate[field]);agCreate.month=new Date(chosen.getFullYear(),chosen.getMonth(),1);renderAgenda()}
     else if(a==='ag-create-date-pick'){var acd=b.getAttribute('data-date');agCreate[agCreate.dateField]=acd;agCreate.dateField='';renderAgenda()}
-    else if(a==='ag-create-duration'){var days=Number(b.getAttribute('data-days')),base=parse(agCreate.start);base.setDate(base.getDate()+days);agCreate.end=iso(base);agCreate.dateField='';renderAgenda()}
+    else if(a==='ag-create-allday'){agCreate.allDay=!agCreate.allDay;if(agCreate.allDay&&agCreate.end<agCreate.start)agCreate.end=agCreate.start;renderAgenda()}
+    else if(a==='ag-create-duration'){var days=Number(b.getAttribute('data-days')),base=parse(agCreate.start);base.setDate(base.getDate()+days-(agCreate.allDay?1:0));agCreate.end=iso(base);agCreate.dateField='';renderAgenda()}
     else if(a==='ag-search-prev'){agSearch.month=new Date(agSearch.month.getFullYear(),agSearch.month.getMonth()-1,1);renderAgenda()}
     else if(a==='ag-search-next'){agSearch.month=new Date(agSearch.month.getFullYear(),agSearch.month.getMonth()+1,1);renderAgenda()}
     else if(a==='ag-search-pick'){var sd=b.getAttribute('data-date');if(!agSearch.from||agSearch.to||sd<agSearch.from){agSearch.from=sd;agSearch.to=''}else if(sd>agSearch.from)agSearch.to=sd;else agSearch.to='';agSearch.status='idle';agSearch.events=[];renderAgenda()}
@@ -1761,11 +1763,11 @@ import { isDisplayableRecord } from './src/records.ts'
   document.addEventListener('submit',function(e){
     var f=e.target;if(f.id==='login-form')return;e.preventDefault();
     if(f.id==='ag-create-form'){
-      var start=agCreate.start+'T'+agCreate.startHour+':'+agCreate.startMinute,end=agCreate.end+'T'+agCreate.endHour+':'+agCreate.endMinute,title=agCreate.title.trim(),calendarId=agCreate.calendarId;
+      var start=agCreate.allDay?agCreate.start:agCreate.start+'T'+agCreate.startHour+':'+agCreate.startMinute,end=agCreate.allDay?agCreate.end:agCreate.end+'T'+agCreate.endHour+':'+agCreate.endMinute,title=agCreate.title.trim(),calendarId=agCreate.calendarId;
       if(!title||!calendarId)return;
-      if(!agCreate.start||!agCreate.end||start>=end){agCreate.error='La fin doit être après le début.';renderAgenda();return}
+      if(!agCreate.start||!agCreate.end||(agCreate.allDay?start>end:start>=end)){agCreate.error=agCreate.allDay?'La fin doit être le même jour ou après le début.':'La fin doit être après le début.';renderAgenda();return}
       agCreate.status='loading';agCreate.error='';renderAgenda();
-      api('agendaCreate',{calendarId:calendarId,title:title,start:start,end:end}).then(function(){agCreate.open=false;agCreate.status='idle';toastMsg('Événement ajouté dans Google Agenda ✓');refreshIntegrations(true);renderAgenda()}).catch(function(error){if(authFail(error))return;agCreate.status='idle';agCreate.error='L’événement n’a pas pu être ajouté. Vérifie les droits Google Agenda puis réessaie.';renderAgenda()});return;
+      api('agendaCreate',{calendarId:calendarId,title:title,start:start,end:end,allDay:agCreate.allDay}).then(function(){agCreate.open=false;agCreate.status='idle';toastMsg('Événement ajouté dans Google Agenda ✓');refreshIntegrations(true);renderAgenda()}).catch(function(error){if(authFail(error))return;agCreate.status='idle';agCreate.error='L’événement n’a pas pu être ajouté. Vérifie les droits Google Agenda puis réessaie.';renderAgenda()});return;
     }
     if(f.classList&&f.classList.contains('care-add')){
       var ci=f.querySelector('input'),sp=splitEmoji(ci.value);
