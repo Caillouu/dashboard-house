@@ -1215,7 +1215,7 @@ body[data-tab="home"][data-view="simple"] .sc-txt h2{font-size:17px}
 body[data-tab="home"] .cgroups>.cgrp{grid-column:span 3}
 body[data-tab="courses"] .cgroups,body[data-tab="voyage"] .cgroups{display:none}
 .gic{font-size:13px;display:flex;align-items:center;justify-content:center}
-.gedit{margin-left:auto;margin-right:6px}
+.gedit{margin-left:auto;margin-right:0}
 .gedit+.mini{margin-left:0}
 .addgrp{display:none;border:1.5px dashed rgba(141,123,240,.35);box-shadow:none;background:transparent;color:var(--lav);font:inherit;font-weight:800;font-size:14px;padding:16px;cursor:pointer;align-items:center;justify-content:center}
 body[data-tab="maison"] .addgrp{display:flex}
