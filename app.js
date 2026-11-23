@@ -695,7 +695,7 @@ import { isDisplayableRecord } from './src/records.ts'
         var d=new Date(t0d);d.setDate(d.getDate()+x.n);var day=x.n===0?'Aujourd\'hui':x.n===1?'Demain':cap(d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'}).replace('.',''));
         var k='<span class="ag-k'+(x.n===0?' td':'')+'"><b>'+esc(day)+'</b>'+(x.k?esc(x.k):'Journée')+'</span>';
         return x.type==='trip'?'<button class="ag-it trip" data-act="trip-open" data-id="'+esc(x.id)+'">'+k+'<span class="ag-t">'+esc(x.em+' '+x.t)+'</span></button>'
-          :'<div class="ag-it ag-tone-'+x.tone+'" role="button" tabindex="0" data-act="ev-edit" data-id="'+esc(x.id)+'">'+k+'<span class="ag-t">'+esc(x.t)+'</span><button class="evx" data-act="ev-hide" data-id="'+esc(x.id)+'" aria-label="Masquer" title="Masquer">×</button></div>'}).join('')
+          :'<div class="ag-it ag-tone-'+x.tone+'" role="button" tabindex="0" data-act="ev-edit" data-id="'+esc(x.id)+'">'+k+'<span class="ag-t">'+esc(x.t)+'</span><button class="evx" data-act="ev-delete" data-id="'+esc(x.id)+'" aria-label="Supprimer définitivement" title="Supprimer">×</button></div>'}).join('')
         :'<p class="ag-none">'+(cal.status==='ok'?'Rien de prévu 🐾':cal.status==='loading'?'Chargement…':'—')+'</p>')+'</section>'}
     if(cal.status!=='ok'&&cal.status!=='loading')body='<p class="empty">L\'agenda ne répond pas pour le moment.</p>'+body;
     var nHid=cal.status==='ok'?cal.events.filter(function(e){return e&&HID.indexOf(e.id)>=0}).length:0;
@@ -1500,6 +1500,20 @@ import { isDisplayableRecord } from './src/records.ts'
   function hideBtn(id,on){return '<button class="evx" data-act="ev-hide" data-id="'+esc(id)+'" aria-label="'+(on?'Réafficher':'Masquer')+'" title="'+(on?'Réafficher':'Masquer')+'">'+(on?UNDO:'×')+'</button>'}
   function evSave(reset){if(!evEdit)return;var v=String(evEdit.v||'').trim().slice(0,80);if(reset||!v||v===evEdit.orig)delete EVN[evEdit.id];else EVN[evEdit.id]=v;saveSetting('eventNames',EVN);evEdit=null;renderSheet();renderCal();renderAgenda();renderHub()}
   function setHid(list){HID=list;saveSetting('hiddenEvents',list);renderCal();renderAgenda();renderHub()}
+  var agendaDeleteId=null;
+  function openAgendaDelete(id){
+    var event=cal.events.find(function(item){return item.id===id}),dialog=$('agenda-delete-dialog');
+    if(!event||!event.sources||!event.sources.length||!dialog)return;
+    agendaDeleteId=id;var title=$('agenda-delete-title');if(title)title.textContent='Supprimer « '+eventTitle(event,'cet événement')+' » ?';dialog.showModal()
+  }
+  function closeAgendaDelete(){var dialog=$('agenda-delete-dialog');if(dialog&&dialog.open)dialog.close();agendaDeleteId=null}
+  function confirmAgendaDelete(){
+    var id=agendaDeleteId,event=cal.events.find(function(item){return item.id===id});if(!event||!event.sources)return closeAgendaDelete();
+    closeAgendaDelete();cal.events=cal.events.filter(function(item){return item.id!==id});renderCal();renderAgenda();renderHub();
+    api('agendaDelete',{sources:event.sources}).then(function(){toastMsg('Événement supprimé de Google Agenda ✓');integrationAt=0;refreshIntegrations(true)}).catch(function(error){
+      if(authFail(error))return;cal.events.push(event);cal.events.sort(function(a,b){var x=a.start.date||a.start.dateTime,y=b.start.date||b.start.dateTime;return x<y?-1:x>y?1:0});renderCal();renderAgenda();renderHub();toastMsg('La suppression a échoué. Réessaie.')
+    })
+  }
 
   var W=null;
   function wIcon(c,day){
@@ -1717,7 +1731,9 @@ import { isDisplayableRecord } from './src/records.ts'
     else if(a==='ev-edit'){var ee=cal.events.filter(function(q){return q.id===id})[0];if(ee){evEdit={id:id,orig:ee.summary||'Sans titre',v:EVN[id]||ee.summary||''};projId=null;openId=null;wishOpen=null;renderSheet()}}
     else if(a==='ev-save'){evSave(false)}
     else if(a==='ev-reset'){evSave(true)}
-    else if(a==='ev-hide'){var hl=HID.slice(),hi=hl.indexOf(id);if(hi>=0)hl.splice(hi,1);else hl.push(id);setHid(hl)}
+    else if(a==='ev-delete'){openAgendaDelete(id)}
+    else if(a==='ev-delete-cancel'){closeAgendaDelete()}
+    else if(a==='ev-delete-confirm'){confirmAgendaDelete()}
     else if(a==='done-tog'){showDone=!showDone;lsSet('maison-show-done',showDone?'1':'0');renderTodo()}
     else if(a==='cal-range'){calRange=b.getAttribute('data-v');lsSet('maison-cal-range',calRange);renderCal()}
     else if(a==='ev-toggle'){showHid=!showHid;renderCal()}

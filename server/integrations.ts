@@ -98,8 +98,9 @@ export async function agenda(env: NodeJS.ProcessEnv) {
         const existing = events.get(key)
         if (existing) {
           if (!existing.calendars.includes(id)) existing.calendars.push(id)
+          existing.sources?.push({ calendarId: id, eventId: item.id })
         } else {
-          events.set(key, { id: hash((item.iCalUID ?? item.id) + '|' + start), summary, start: date ? { date } : { dateTime: start }, calendars: [id] })
+          events.set(key, { id: hash((item.iCalUID ?? item.id) + '|' + start), summary, start: date ? { date } : { dateTime: start }, calendars: [id], sources: [{ calendarId: id, eventId: item.id }] })
         }
       }
     }
@@ -145,8 +146,9 @@ export async function searchAgenda(env: NodeJS.ProcessEnv, from: string, to: str
       const existing = events.get(key)
       if (existing) {
         if (!existing.calendars.includes(id)) existing.calendars.push(id)
+        existing.sources?.push({ calendarId: id, eventId: item.id })
       } else {
-        events.set(key, { id: hash((item.iCalUID ?? item.id) + '|' + start), summary, start: date ? { date } : { dateTime: start }, calendars: [id] })
+        events.set(key, { id: hash((item.iCalUID ?? item.id) + '|' + start), summary, start: date ? { date } : { dateTime: start }, calendars: [id], sources: [{ calendarId: id, eventId: item.id }] })
       }
     }
   }
@@ -171,6 +173,19 @@ export async function createAgendaEvent(env: NodeJS.ProcessEnv, calendarId: stri
   })
   calendarCache.until = 0
   return { id: hash(event.id + '|' + start) }
+}
+
+export async function deleteAgendaEvent(env: NodeJS.ProcessEnv, sources: { calendarId: string; eventId: string }[]) {
+  const ids = calendarIds(env)
+  const token = await googleAccessToken(env)
+  await Promise.all(sources.map(async source => {
+    const rawCalendarId = ids.find(id => hash(id) === source.calendarId)
+    if (!rawCalendarId) throw new Error('Unknown configured Google calendar')
+    const url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(rawCalendarId) + '/events/' + encodeURIComponent(source.eventId)
+    const response = await fetch(url, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(7000) })
+    if (!response.ok && response.status !== 404 && response.status !== 410) throw new Error('Upstream HTTP ' + response.status)
+  }))
+  calendarCache.until = 0
 }
 
 type Forecast = {
