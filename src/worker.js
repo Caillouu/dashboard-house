@@ -23,3 +23,24 @@ self.addEventListener('fetch', event => {
     event.respondWith(caches.open(cacheName).then(async cache => (await cache.match(url.pathname)) ?? fetch(request)))
   }
 })
+
+self.addEventListener('push', event => {
+  let data = { title: 'Maison', body: 'Nouvelle notification', url: '/' }
+  try { data = { ...data, ...event.data.json() } } catch {}
+  event.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: '/assets/icon-192.png?i=2',
+    badge: '/assets/favicon-round.png',
+    tag: data.tag,
+    data: { url: data.url || '/' },
+  }))
+})
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  const target = new URL(event.notification.data?.url || '/', self.location.origin).href
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+    const client = clients.find(item => item.url === target)
+    return client ? client.focus() : self.clients.openWindow(target)
+  }))
+})
