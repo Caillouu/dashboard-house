@@ -97,6 +97,12 @@ test('sessions, household state, repeated requests, and stale offline edits', as
     assert.deepEqual(JSON.parse(p1Quests.sheets.projects[0][5]), {
       visibility: 'private', createdBy: 'p1',
     })
+    const completedPrivateQuest = {
+      ...privateQuest, revision: 1, operationId: randomUUID(),
+      row: ['secret', '👻', 'Surprise', '', '', JSON.stringify({ visibility: 'private', status: 'done' })],
+    }
+    assert.deepEqual(await (await call(completedPrivateQuest, cookie1)).json(), { ok: true, revision: 2 })
+    assert.deepEqual((await (await call({ a: 'load' }, cookie1)).json()).questScores, { p1: 0, p2: 0 })
     const p2Quests = await (await call({ a: 'load' }, cookie2)).json()
     assert.deepEqual(p2Quests.sheets.projects, [])
     assert.equal(p2Quests.revisions['projects:secret'], undefined)
