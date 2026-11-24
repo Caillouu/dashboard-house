@@ -87,7 +87,7 @@ export type CalendarEvent = {
   calendars: string[]
   sources?: { calendarId: string; eventId: string }[]
 }
-export type Agenda = { events: CalendarEvent[]; calendars: { id: string; name: string }[] }
+export type Agenda = { events: CalendarEvent[]; tripEvents?: CalendarEvent[]; calendars: { id: string; name: string }[] }
 export type Snapshot = {
   sheets: Record<Collection, Array<Array<string | number>>>
   settings: { hiddenEvents?: string[]; eventNames?: Record<string, string> }
