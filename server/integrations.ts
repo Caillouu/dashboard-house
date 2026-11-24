@@ -61,17 +61,29 @@ function label(summary: string, index: number) {
   return value ? (value[0].toUpperCase() + value.slice(1)).slice(0, 60) : 'Agenda ' + (index + 1)
 }
 
-async function readCalendar(id: string, index: number, token: string, timeMin: string, timeMax: string, maxResults = '80') {
+async function readCalendar(id: string, index: number, token: string, timeMin: string, timeMax: string, maxResults = '80', paginate = false) {
   const url = new URL('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(id) + '/events')
   url.search = new URLSearchParams({
     singleEvents: 'true', orderBy: 'startTime', maxResults,
     timeMin, timeMax,
     timeZone: 'Europe/Paris',
-    fields: 'summary,items(id,iCalUID,summary,status,start,end)',
+    fields: 'summary,nextPageToken,items(id,iCalUID,summary,status,start,end)',
   }).toString()
-  const page = await json<CalendarPage>(url, { headers: { Authorization: 'Bearer ' + token } })
-  return { id: hash(id), name: label(page.summary ?? '', index), items: page.items ?? [] }
+  const items: GoogleEvent[] = []
+  let summary = ''
+  let pageToken: string | undefined
+  do {
+    if (pageToken) url.searchParams.set('pageToken', pageToken)
+    const page = await json<CalendarPage>(url, { headers: { Authorization: 'Bearer ' + token } })
+    summary ||= page.summary ?? ''
+    items.push(...(page.items ?? []))
+    pageToken = page.nextPageToken
+  } while (paginate && pageToken)
+  return { id: hash(id), name: label(summary, index), items }
 }
+
+const tripTitle = /^(?:[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]\s*)*(?:vacances?|week[\s‑–-]?end|flight)\b/iu
+const shiftDay = (day: string, days: number) => new Date(Date.parse(day + 'T00:00:00Z') + days * 864e5).toISOString().slice(0, 10)
 
 export async function agenda(env: NodeJS.ProcessEnv) {
   const ids = calendarIds(env)
@@ -79,8 +91,16 @@ export async function agenda(env: NodeJS.ProcessEnv) {
   return cached(calendarCache, 300_000, async () => {
     const token = await googleAccessToken(env)
     const now = new Date()
-    const results = await Promise.allSettled(ids.map((id, i) => readCalendar(id, i, token, now.toISOString(), new Date(now.getTime() + 35 * 864e5).toISOString())))
+    const today = parisDate(now.toISOString())
+    const lastTripDay = shiftDay(today, 365)
+    const agendaStart = now.toISOString()
+    const agendaEnd = new Date(now.getTime() + 35 * 864e5).toISOString()
+    const agendaEndDay = parisDate(agendaEnd)
+    const annualStart = shiftDay(today, -60) + 'T00:00:00Z'
+    const annualEnd = shiftDay(lastTripDay, 2) + 'T00:00:00Z'
+    const results = await Promise.allSettled(ids.map((id, i) => readCalendar(id, i, token, annualStart, annualEnd, '2500', true)))
     const events = new Map<string, CalendarEvent>()
+    const upcoming = new Set<string>()
     const calendars: Agenda['calendars'] = []
     for (const result of results) {
       if (result.status !== 'fulfilled') {
@@ -96,6 +116,13 @@ export async function agenda(env: NodeJS.ProcessEnv) {
         const start = date ?? new Date(dateTime!).toISOString()
         const summary = (item.summary ?? '').slice(0, 120)
         const key = summary + '|' + start
+        const endTime = item.end?.dateTime
+        const endDay = item.end?.date
+        const inAgenda = date
+          ? (endDay ? endDay > today : date >= today) && date <= agendaEndDay
+          : (endTime ? new Date(endTime).toISOString() > agendaStart : start >= agendaStart) && start < agendaEnd
+        if (inAgenda) upcoming.add(key)
+        if (!inAgenda && (!tripTitle.test(summary.trim()) || (date ?? parisDate(start)) > lastTripDay)) continue
         const existing = events.get(key)
         if (existing) {
           if (!existing.calendars.includes(id)) existing.calendars.push(id)
@@ -108,7 +135,12 @@ export async function agenda(env: NodeJS.ProcessEnv) {
     }
     if (!calendars.length) throw new Error('No configured Google calendar is accessible')
     const sortKey = (ev: CalendarEvent) => 'date' in ev.start ? ev.start.date : ev.start.dateTime
-    return { calendars, events: [...events.values()].sort((a, b) => sortKey(a).localeCompare(sortKey(b))).slice(0, 80) }
+    const ordered = [...events.entries()].sort(([, a], [, b]) => sortKey(a).localeCompare(sortKey(b)))
+    return {
+      calendars,
+      events: ordered.filter(([key]) => upcoming.has(key)).slice(0, 80).map(([, event]) => event),
+      tripEvents: ordered.map(([, event]) => event).filter(event => tripTitle.test(event.summary.trim())),
+    }
   })
 }
 

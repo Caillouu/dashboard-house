@@ -127,7 +127,7 @@ import { isDisplayableRecord } from './src/records.ts'
     integrationAt=Date.now();var epoch=sessionEpoch;
     api('agenda').then(function(j){
       if(epoch!==sessionEpoch)return;
-      cal={status:'ok',events:j.events,calendars:j.calendars};renderCal();render();cacheNow();
+      cal={status:'ok',events:j.events,tripEvents:j.tripEvents,calendars:j.calendars};renderCal();render();cacheNow();
     }).catch(function(){if(epoch===sessionEpoch&&cal.status!=='ok'){cal={status:'error',events:[]};renderCal();render()}});
     api('weather').then(function(j){
       if(epoch!==sessionEpoch)return;
@@ -1129,12 +1129,72 @@ import { isDisplayableRecord } from './src/records.ts'
     if(!part)return '';if(part.date){var date=part.date;if(isEnd){var d=parse(date);d.setDate(d.getDate()-1);date=iso(d)}return date}
     var d2=new Date(part.dateTime);return isNaN(d2)?'':new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(d2)
   }
-  function isAgendaTrip(event){var title=nrm(event&&event.summary);return /(^|\s)(week[ -]?end|voyage)(\s|$)/.test(title)}
-  function isMultiDayAgendaTrip(event){var start=agendaTripDate(event&&event.start,false),end=agendaTripDate(event&&event.end,true);return isAgendaTrip(event)&&start&&end>start}
-  function agendaTrips(){return cal.status==='ok'?cal.events.filter(isAgendaTrip).map(function(event){
-    var start=agendaTripDate(event.start,false),end=agendaTripDate(event.end,true)||start;
-    return {id:'agenda-'+event.id,type:'voyage',trip:'',title:eventTitle(event,'Voyage'),emoji:'🗓️',start:start,end:end,done:false,agenda:true}
-  }):[]}
+  function agendaTripKind(event){
+    var title=nrm(event&&event.summary).replace(/^(?:[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]\s*)+/u,'');
+    var match=title.match(/^(vacances?|week[\s‑–-]?end|flight)\b/);
+    return match?match[1]:'';
+  }
+  function isMultiDayAgendaTrip(event){
+    var kind=agendaTripKind(event),start=agendaTripDate(event&&event.start,false),end=agendaTripDate(event&&event.end,true);
+    return kind&&kind!=='flight'&&start&&end>start;
+  }
+  function flightRoute(title){
+    var route=nrm(title).match(/\b([a-z]{3})\s*(?:→|➝|->|–|-|to)\s*([a-z]{3})\b/);
+    return route?route.slice(1):null;
+  }
+  function agendaTrips(){
+    if(cal.status!=='ok')return [];
+    var today=agendaTripDate({dateTime:new Date().toISOString()},false),limit=parse(today);
+    limit.setDate(limit.getDate()+365);
+    var stays=[],flights=[];
+    (cal.tripEvents||cal.events).forEach(function(event){
+      var kind=agendaTripKind(event),start=agendaTripDate(event.start,false),end=agendaTripDate(event.end,true)||start;
+      if(!kind||!start||start>iso(limit))return;
+      var trip={id:'agenda-'+event.id,type:'voyage',trip:'',title:kind==='flight'?event.summary:eventTitle(event,'Voyage'),emoji:kind==='flight'?'🛫':'🗓️',start:start,end:end,done:false,agenda:true};
+      if(kind==='flight')flights.push({trip:trip,route:flightRoute(event.summary),calendars:event.calendars||[]});
+      else stays.push(trip);
+    });
+    flights.sort(function(a,b){return byStart(a.trip,b.trip)});
+    var used=new Set();
+    function sameCalendar(a,b){return a.calendars.some(function(id){return b.calendars.includes(id)})}
+    function enclose(stay,outbound,inbound){
+      return outbound.trip.start<=stay.start&&inbound.trip.end>=stay.end
+        &&parse(stay.start)-parse(outbound.trip.start)<=864e5*2
+        &&parse(inbound.trip.end)-parse(stay.end)<=864e5*2;
+    }
+    function attach(stay,outbound,inbound){
+      used.add(outbound);used.add(inbound);
+      stay.start=outbound.trip.start;stay.end=inbound.trip.end;
+      stay.flightSummary='Aller '+fmtDay(outbound.trip.start)+' · Retour '+fmtDay(inbound.trip.start);
+    }
+    flights.forEach(function(outbound,i){
+      if(used.has(outbound)||/\b(retour|return|inbound)\b/i.test(outbound.trip.title))return;
+      var following=flights.slice(i+1).filter(function(flight){
+        return !used.has(flight)&&!(/\b(aller|outbound)\b/i.test(flight.trip.title))
+          &&parse(flight.trip.start)-parse(outbound.trip.start)<=60*864e5;
+      });
+      var inbound=outbound.route&&following.find(function(flight){
+        return flight.route&&outbound.route[0]===flight.route[1]&&outbound.route[1]===flight.route[0];
+      });
+      if(!inbound)inbound=following.find(function(flight){
+        if(!sameCalendar(outbound,flight)||outbound.route||flight.route)return false;
+        return stays.some(function(stay){return !stay.flightSummary&&enclose(stay,outbound,flight)});
+      });
+      if(!inbound){
+        var next=flights[i+1];
+        if(next&&following.includes(next)&&!outbound.route&&!next.route&&sameCalendar(outbound,next))inbound=next;
+      }
+      if(!inbound)return;
+      var stay=stays.find(function(item){return !item.flightSummary&&enclose(item,outbound,inbound)});
+      if(!stay){
+        stay={...outbound.trip,title:outbound.route?'Voyage · '+outbound.route[1].toUpperCase():outbound.trip.title};
+        stays.push(stay);
+      }
+      attach(stay,outbound,inbound);
+    });
+    return stays.concat(flights.filter(function(flight){return !used.has(flight)}).map(function(flight){return flight.trip}))
+      .filter(function(trip){return trip.end>=today});
+  }
   function trips(){return S.voyages.filter(function(x){return x.type==='voyage'}).concat(agendaTrips())}
   function kids(tid,type){return S.voyages.filter(function(x){return x.trip===tid&&x.type!=='voyage'&&(!type||x.type===type)})}
   function byStart(a,b){var sk=function(v){return !v?'9999':v.length===10?v+' 99:99':v},x=sk(a.start),y=sk(b.start);if(x!==y)return x<y?-1:1;return (a.createdAt||0)-(b.createdAt||0)}
@@ -1187,7 +1247,7 @@ import { isDisplayableRecord } from './src/records.ts'
     var all=trips().map(function(t){return {t:t,st:tripState(t)}}),R={now:0,soon:1,nodate:2};
     var up=all.filter(function(x){return x.st.k!=='past'}).sort(function(a,b){if(R[a.st.k]!==R[b.st.k])return R[a.st.k]-R[b.st.k];return a.st.sp.s<b.st.sp.s?-1:a.st.sp.s>b.st.sp.s?1:0});
     var past=all.filter(function(x){return x.st.k==='past'}).sort(function(a,b){return a.st.sp.s<b.st.sp.s?1:-1});
-    var tile=function(x){var t=x.t,c=tripCounts(t);
+    var tile=function(x){var t=x.t,c=t.flightSummary||tripCounts(t);
       return '<button class="ttile '+x.st.k+'" data-act="'+(t.agenda?'hub-go':'trip-open')+'" '+(t.agenda?'data-v="agenda"':'data-id="'+esc(t.id)+'"')+'><span class="tt-em" aria-hidden="true">'+esc(tEmo(t))+'</span>'+
         '<span class="tt-main"><span class="tt-t">'+esc(t.title)+'</span><span class="tt-d">'+esc(spanTxt(x.st.sp))+'</span>'+(c?'<span class="tt-c">'+esc(c)+'</span>':'')+'</span>'+
         '<span class="tt-b">'+esc(tripBadge(x.st))+'</span></button>'};
@@ -1526,9 +1586,11 @@ import { isDisplayableRecord } from './src/records.ts'
   function closeAgendaDelete(){var dialog=$('agenda-delete-dialog');if(dialog&&dialog.open)dialog.close();agendaDeleteId=null}
   function confirmAgendaDelete(){
     var id=agendaDeleteId,event=cal.events.find(function(item){return item.id===id});if(!event||!event.sources)return closeAgendaDelete();
-    closeAgendaDelete();cal.events=cal.events.filter(function(item){return item.id!==id});renderCal();renderAgenda();renderHub();
+    var tripEvent=cal.tripEvents&&cal.tripEvents.find(function(item){return item.id===id});
+    if(tripEvent)cal.tripEvents=cal.tripEvents.filter(function(item){return item.id!==id});
+    closeAgendaDelete();cal.events=cal.events.filter(function(item){return item.id!==id});renderCal();render();
     api('agendaDelete',{sources:event.sources}).then(function(){toastMsg('Événement supprimé de Google Agenda ✓');integrationAt=0;refreshIntegrations(true)}).catch(function(error){
-      if(authFail(error))return;cal.events.push(event);cal.events.sort(function(a,b){var x=a.start.date||a.start.dateTime,y=b.start.date||b.start.dateTime;return x<y?-1:x>y?1:0});renderCal();renderAgenda();renderHub();toastMsg('La suppression a échoué. Réessaie.')
+      if(authFail(error))return;if(tripEvent&&cal.tripEvents&&!cal.tripEvents.some(function(item){return item.id===id}))cal.tripEvents.push(tripEvent);cal.events.push(event);cal.events.sort(function(a,b){var x=a.start.date||a.start.dateTime,y=b.start.date||b.start.dateTime;return x<y?-1:x>y?1:0});renderCal();render();toastMsg('La suppression a échoué. Réessaie.')
     })
   }
 
@@ -1575,11 +1637,11 @@ import { isDisplayableRecord } from './src/records.ts'
 
   /* Mémoire locale : dernières données connues, affichées si le réseau manque */
   var cacheT=null,fromCache=false;
-  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,QS:QUEST_SCORES,RS:ROUTINE_SCORES,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))}
+  function cacheNow(){if(fromCache||!KEY)return;clearTimeout(cacheT);lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,QS:QUEST_SCORES,RS:ROUTINE_SCORES,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars,tripEvents:cal.tripEvents}))}
   window.addEventListener('pagehide',cacheNow);document.addEventListener('visibilitychange',function(){if(document.hidden)cacheNow()});
   function cacheSave(){
     if(fromCache||!KEY)return;clearTimeout(cacheT);
-    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,QS:QUEST_SCORES,RS:ROUTINE_SCORES,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars}))},600);
+    cacheT=setTimeout(function(){lsSet(CK,JSON.stringify({t:Date.now(),revisions:revisions,S:S,P:PEOPLE,QS:QUEST_SCORES,RS:ROUTINE_SCORES,W:W,HID:HID,EVN:EVN,cal:(cal&&cal.status==='ok')?cal.events:null,calendars:cal.calendars,tripEvents:cal.tripEvents}))},600);
   }
   function cacheLoad(){
     try{
@@ -1587,7 +1649,7 @@ import { isDisplayableRecord } from './src/records.ts'
       ['projects','routines','shop','courses','voyages','debts'].forEach(function(k){S[k]=Array.isArray(c.S[k])?c.S[k]:[];loaded[k]=true});
       revisions=c.revisions||{};setPeople(c.P);QUEST_SCORES={p1:Number(c.QS&&c.QS.p1)||0,p2:Number(c.QS&&c.QS.p2)||0};ROUTINE_SCORES={p1:Number(c.RS&&c.RS.p1)||0,p2:Number(c.RS&&c.RS.p2)||0};W=c.W||null;HID=Array.isArray(c.HID)?c.HID:[];EVN=c.EVN||{};
       overlayOutbox(); /* modifs faites hors ligne et pas encore envoyées */
-      if(Array.isArray(c.cal))cal={status:'ok',events:c.cal,calendars:Array.isArray(c.calendars)?c.calendars:[]};
+      if(Array.isArray(c.cal))cal={status:'ok',events:c.cal,tripEvents:Array.isArray(c.tripEvents)?c.tripEvents:undefined,calendars:Array.isArray(c.calendars)?c.calendars:[]};
       fromCache=c.t;return true;
     }catch(e){return false}
   }
