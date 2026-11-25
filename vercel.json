@@ -5,6 +5,7 @@
   "outputDirectory": "dist",
   "regions": ["cdg1"],
   "functions": {
+    "api/alexa.ts": { "includeFiles": "{server,shared}/**/*.ts" },
     "api/dashboard.ts": { "includeFiles": "{server,shared}/**/*.ts" },
     "api/notifications.ts": { "includeFiles": "{server,shared}/**/*.ts" }
   },

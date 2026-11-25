@@ -11,7 +11,7 @@
     "build": "npm run check && vite build",
     "preview": "vite preview",
     "db:migrate": "node --env-file-if-exists=.env.local tools/migrate.ts",
-    "test": "node --test tools/dashboard.test.ts"
+    "test": "node --test tools/*.test.ts"
   },
   "dependencies": {
     "@libsql/client": "0.17.4",
