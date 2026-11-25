@@ -528,6 +528,21 @@ import { isDisplayableRecord } from './src/records.ts'
     d+='<ellipse cx="290" cy="232" rx="150" ry="46" fill="'+(/night/.test(mood)?'#3B3374':mood==='snow'?'#F4F6FB':'#BFE8C9')+'"/>';
     return '<svg class="sc-svg" viewBox="0 0 360 230" preserveAspectRatio="xMaxYMax slice" aria-hidden="true">'+d+'</svg>'}
   var weatherSlide=0, weatherDates=[null,null], weatherTouch=null, weatherMascots=[randomMascot(),randomMascot()];
+  // Lundi de référence pour une garde à la maison.
+  var childcareHomeMonday=Date.parse('2027-01-04T00:00:00Z');
+  function childcareBadge(date){
+    if(!date)return '';
+    var day=new Date(date+'T00:00:00Z');
+    var weekday=day.getUTCDay();
+    if(!weekday||weekday===6)return '';
+    var atHome=weekday===3||weekday===4;
+    if(weekday===1){
+      atHome=(day.getTime()-childcareHomeMonday)%(14*86400000)===0;
+    }
+    var label=atHome?'Garde à la maison':'Garde chez la co-famille';
+    return '<div class="sc-childcare"><span class="sc-childcare-badge'+(atHome?' is-home':'')+
+      '" role="img" aria-label="'+label+'" title="'+label+'">'+(atHome?'🏠':'📍')+'</span></div>';
+  }
   function weatherCard(slide){
     var weather=slide===0?W:W&&W.auxerre;
     var days=weather&&weather.days||[], date=weatherDates[slide];
@@ -559,6 +574,7 @@ import { isDisplayableRecord } from './src/records.ts'
     }
     h+='</div>';
     if(days.length>1){
+      h+=childcareBadge((forecast||days[0]).date);
       h+='<div class="sc-weather-days" role="group" aria-label="Prévisions par jour">'+days.map(function(day,i){
         var label=i===0?"Aujourd’hui":dayName(day.date,false);
         var active=i===0?!forecast:forecast===day;
