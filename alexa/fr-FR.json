@@ -128,7 +128,7 @@
             }
           ],
           "samples": [
-            "ajoute l’activité {titre}"
+            "ajoute l'activité {titre}"
           ]
         },
         {
@@ -140,7 +140,7 @@
             }
           ],
           "samples": [
-            "ajoute l’hébergement {titre}"
+            "ajoute l'hébergement {titre}"
           ]
         },
         {
@@ -238,7 +238,7 @@
             }
           ],
           "samples": [
-            "ajoute l’événement {titre}",
+            "ajoute l'événement {titre}",
             "ajoute le rendez-vous sur la journée {titre}"
           ]
         },
@@ -258,79 +258,79 @@
           "name": "Dictee",
           "slots": [
             {
-              "name": "valeur",
+              "name": "texteDicte",
               "type": "AMAZON.SearchQuery"
             }
           ],
           "samples": [
-            "écris {valeur}",
-            "le nom est {valeur}",
-            "note {valeur}"
+            "écris {texteDicte}",
+            "le nom est {texteDicte}",
+            "note {texteDicte}"
           ]
         },
         {
           "name": "DateValeur",
           "slots": [
             {
-              "name": "valeur",
+              "name": "date",
               "type": "AMAZON.DATE"
             }
           ],
           "samples": [
-            "le {valeur}",
-            "c’est le {valeur}"
+            "le {date}",
+            "c'est le {date}"
           ]
         },
         {
           "name": "HeureValeur",
           "slots": [
             {
-              "name": "valeur",
+              "name": "heure",
               "type": "AMAZON.TIME"
             }
           ],
           "samples": [
-            "à {valeur}",
-            "il est {valeur}"
+            "à {heure}",
+            "il est {heure}"
           ]
         },
         {
           "name": "EurosValeur",
           "slots": [
             {
-              "name": "valeur",
+              "name": "euros",
               "type": "AMAZON.NUMBER"
             }
           ],
           "samples": [
-            "{valeur} euros",
-            "{valeur} euro"
+            "{euros} euros",
+            "{euros} euro"
           ]
         },
         {
           "name": "CentimesValeur",
           "slots": [
             {
-              "name": "valeur",
+              "name": "centimes",
               "type": "AMAZON.NUMBER"
             }
           ],
           "samples": [
-            "{valeur} centimes",
-            "{valeur} centime"
+            "{centimes} centimes",
+            "{centimes} centime"
           ]
         },
         {
           "name": "MembreValeur",
           "slots": [
             {
-              "name": "valeur",
+              "name": "membre",
               "type": "MembreDuFoyer"
             }
           ],
           "samples": [
-            "{valeur}",
-            "payé par le {valeur}"
+            "{membre}",
+            "payé par le {membre}"
           ]
         },
         {
