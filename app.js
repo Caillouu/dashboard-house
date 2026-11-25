@@ -530,18 +530,25 @@ import { isDisplayableRecord } from './src/records.ts'
   var weatherSlide=0, weatherDates=[null,null], weatherTouch=null, weatherMascots=[randomMascot(),randomMascot()];
   // Lundi de référence pour une garde à la maison.
   var childcareHomeMonday=Date.parse('2027-01-04T00:00:00Z');
-  function childcareBadge(date){
-    if(!date)return '';
+  function childcareAtHome(date){
+    if(!date)return null;
     var day=new Date(date+'T00:00:00Z');
     var weekday=day.getUTCDay();
-    if(!weekday||weekday===6)return '';
+    if(!weekday||weekday===6)return null;
     var atHome=weekday===3||weekday===4;
     if(weekday===1){
       atHome=(day.getTime()-childcareHomeMonday)%(14*86400000)===0;
     }
-    var label=atHome?'Garde à la maison':'Garde chez la co-famille';
-    return '<span class="sc-childcare-badge'+(atHome?' is-home':'')+
-      '" role="img" aria-label="'+label+'" title="'+label+'">'+(atHome?'🏠':'📍')+'</span>';
+    return atHome;
+  }
+  function childcareBadge(atHome,label){
+    if(atHome===null)return '';
+    var outline=atHome
+      ?'<path d="M3 9l5-5 5 5v5H3z"/>'
+      :'<path d="M1 8l3.5-3.5L8 8v5H1zM8 5l3-3 4 4v5h-4"/>';
+    return '<span class="sc-childcare-badge'+(atHome?' is-home':'')+'" title="'+label+'">'+
+      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+outline+'</svg>'+
+      '</span>';
   }
   function weatherCard(slide){
     var weather=slide===0?W:W&&W.auxerre;
@@ -577,8 +584,10 @@ import { isDisplayableRecord } from './src/records.ts'
       h+='<div class="sc-weather-days" role="group" aria-label="Prévisions par jour">'+days.map(function(day,i){
         var label=i===0?"Aujourd’hui":dayName(day.date,false);
         var active=i===0?!forecast:forecast===day;
-        return '<div class="sc-weather-day"><button type="button" data-act="weather-day" data-id="'+(i===0?'':esc(day.date))+'" aria-pressed="'+active+'" aria-label="'+esc(label+', '+day.label+', minimum '+t(day.low)+', maximum '+t(day.high))+'">'+
-          '<span>'+esc(label)+'</span>'+wIcon(day.cond,day.isDay)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span></button>'+childcareBadge(day.date)+'</div>';
+        var atHome=childcareAtHome(day.date);
+        var childcareLabel=atHome===null?'':atHome?'Garde à la maison':'Garde chez la co-famille';
+        return '<button type="button" data-act="weather-day" data-id="'+(i===0?'':esc(day.date))+'" aria-pressed="'+active+'" aria-label="'+esc(label+', '+day.label+', minimum '+t(day.low)+', maximum '+t(day.high)+(childcareLabel?', '+childcareLabel:''))+'">'+
+          '<span>'+esc(label)+'</span>'+wIcon(day.cond,day.isDay)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span>'+childcareBadge(atHome,childcareLabel)+'</button>';
       }).join('')+'</div>';
     }
     return h;
