@@ -543,10 +543,9 @@ import { isDisplayableRecord } from './src/records.ts'
   }
   function childcareBadge(atHome,label){
     if(atHome===null)return '';
-    var icon=atHome
-      ?'🏠<img src="assets/charlie.png" alt="" class="sc-childcare-charlie">'
-      :'🛎️';
-    return '<span class="sc-childcare-badge'+(atHome?' is-home':'')+'" title="'+label+'" aria-hidden="true">'+icon+'</span>';
+    var icon=atHome?'🏠':'🛎️';
+    return '<span class="sc-childcare-badge'+(atHome?' is-home':'')+'" title="'+label+'" aria-hidden="true">'+icon+
+      '<img src="assets/charlie.png" alt="" class="sc-childcare-charlie"></span>';
   }
   function weatherCard(slide){
     var weather=slide===0?W:W&&W.auxerre;
