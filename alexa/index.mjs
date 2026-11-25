@@ -104,21 +104,37 @@ export async function handler(event) {
   }
   const request = event.request
   if (request?.type === 'SessionEndedRequest') return { version: '1.0', response: {} }
-  if (request?.type === 'LaunchRequest') return message(help, undefined, true)
+  if (request?.type === 'LaunchRequest') return message('Maison Courses. Quel article ou quelle quête veux-tu ajouter ?', undefined, true)
   if (request?.type !== 'IntentRequest') return message('Ouvre le skill maison courses pour ajouter un élément.')
   const { name, slots } = request.intent
   const state = event.session?.attributes?.addition
   if (['AMAZON.StopIntent', 'AMAZON.CancelIntent', 'AMAZON.NoIntent'].includes(name)) return message('D’accord, ajout annulé.')
   if (name === 'AMAZON.HelpIntent') return state ? advance(state) : message(help, undefined, true)
-  if (name === 'AjouterCourseIntent') {
-    const raw = slots?.article?.value
-    const title = validate('text', typeof raw === 'string'
-      ? raw.trim().replace(/^(?:(?:du|des|de la)\s+|de l['’]\s*)/i, '')
-      : raw, 'title')
-    if (!title || typeof request.requestId !== 'string') return message('Dis par exemple : ajoute du lait.', undefined, true)
+  const quickCommand = {
+    AjouterCourseIntent: 'Course',
+    Quest: 'Quest',
+    PrivateQuest: 'PrivateQuest',
+    AjouterEtapeIntent: 'Step',
+  }[name]
+  if (quickCommand) {
+    const raw = slots?.article?.value ?? slots?.titre?.value
+    const text = typeof raw === 'string' ? raw.trim() : ''
+    const step = quickCommand === 'Step'
+      ? text.match(/^(.+?)\s+dans la qu[eê]te\s+(.+)$/i)
+      : undefined
+    const title = validate('text', quickCommand === 'Step' ? step?.[1]
+      : quickCommand === 'Course' ? text.replace(/^(?:(?:du|des|de la)\s+|de l['’]\s*)/i, '') : text, 'title')
+    const parentName = validate('text', step?.[2], 'parent')
+    if (!title || (quickCommand === 'Step' && !parentName) || typeof request.requestId !== 'string') {
+      return message(quickCommand === 'Step'
+        ? 'Dis par exemple : ajoute étape acheter la peinture dans la quête refaire le salon.'
+        : 'Indique le nom à ajouter.', undefined, true)
+    }
     const hash = createHash('sha256').update(request.requestId).digest('hex')
-    const operationId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
-    return submit({ kind: 'course', title }, { command: 'Course', index: 2, values: { title }, operationId }, env)
+    const operationId = hash.replace(/^(.{8})(.{4}).(.{3}).(.{3})(.{12}).*$/, '$1-$2-4$3-8$4-$5')
+    const [, , preset, fields] = commands[quickCommand]
+    const values = parentName ? { title, parent: parentName } : { title }
+    return submit({ ...preset, ...values }, { command: quickCommand, index: fields.length, values, operationId }, env)
   }
   if (Object.hasOwn(commands, name)) {
     const value = validate('text', slots?.titre?.value, 'title')

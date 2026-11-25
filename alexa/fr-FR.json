@@ -64,7 +64,9 @@
           ],
           "samples": [
             "ajoute la quête {titre}",
-            "crée la quête {titre}"
+            "crée la quête {titre}",
+            "créer la quête {titre}",
+            "créer une quête {titre}"
           ]
         },
         {
@@ -369,7 +371,24 @@
           ],
           "samples": [
             "ajoute {article}",
-            "ajouter {article}"
+            "ajouter {article}",
+            "ajoute {article} dans les courses",
+            "ajouter {article} dans les courses"
+          ]
+        },
+        {
+          "name": "AjouterEtapeIntent",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute étape {titre}",
+            "ajouter étape {titre}",
+            "ajoute l'étape {titre}",
+            "ajouter l'étape {titre}"
           ]
         }
       ],
