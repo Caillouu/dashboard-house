@@ -135,9 +135,10 @@ export async function handler(event) {
       state.index++
       return advance(state)
     }
+    const answerSlot = slots?.valeur ?? Object.values(slots ?? {})[0]
     const raw = type === 'payer'
-      ? slots?.valeur?.resolutions?.resolutionsPerAuthority?.flatMap(authority => authority.values ?? [])[0]?.value?.id
-      : slots?.valeur?.value
+      ? answerSlot?.resolutions?.resolutionsPerAuthority?.flatMap(authority => authority.values ?? [])[0]?.value?.id
+      : answerSlot?.value
     const value = answerIntents[name] === type ? validate(type, raw, key) : undefined
     if (value === undefined) return message(prompt, state)
     state.values[key] = value
