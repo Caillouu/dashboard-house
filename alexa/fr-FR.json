@@ -1,7 +1,7 @@
 {
   "interactionModel": {
     "languageModel": {
-      "invocationName": "maison au quotidien",
+      "invocationName": "maison courses",
       "intents": [
         {
           "name": "Course",
@@ -358,6 +358,19 @@
         },
         {
           "name": "AMAZON.FallbackIntent"
+        },
+        {
+          "name": "AjouterCourseIntent",
+          "slots": [
+            {
+              "name": "article",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute {article}",
+            "ajouter {article}"
+          ]
         }
       ],
       "types": [
