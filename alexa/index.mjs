@@ -105,11 +105,21 @@ export async function handler(event) {
   const request = event.request
   if (request?.type === 'SessionEndedRequest') return { version: '1.0', response: {} }
   if (request?.type === 'LaunchRequest') return message(help, undefined, true)
-  if (request?.type !== 'IntentRequest') return message('Ouvre le skill maison au quotidien pour ajouter un élément.')
+  if (request?.type !== 'IntentRequest') return message('Ouvre le skill maison courses pour ajouter un élément.')
   const { name, slots } = request.intent
   const state = event.session?.attributes?.addition
   if (['AMAZON.StopIntent', 'AMAZON.CancelIntent', 'AMAZON.NoIntent'].includes(name)) return message('D’accord, ajout annulé.')
   if (name === 'AMAZON.HelpIntent') return state ? advance(state) : message(help, undefined, true)
+  if (name === 'AjouterCourseIntent') {
+    const raw = slots?.article?.value
+    const title = validate('text', typeof raw === 'string'
+      ? raw.trim().replace(/^(?:(?:du|des|de la)\s+|de l['’]\s*)/i, '')
+      : raw, 'title')
+    if (!title || typeof request.requestId !== 'string') return message('Dis par exemple : ajoute du lait.', undefined, true)
+    const hash = createHash('sha256').update(request.requestId).digest('hex')
+    const operationId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
+    return submit({ kind: 'course', title }, { command: 'Course', index: 2, values: { title }, operationId }, env)
+  }
   if (Object.hasOwn(commands, name)) {
     const value = validate('text', slots?.titre?.value, 'title')
     if (!value || (name === 'Group' && value.length > 24)) return message('Dicte un nom court, puis réessaie.', undefined, true)
@@ -137,6 +147,10 @@ export async function handler(event) {
   if (name !== 'AMAZON.YesIntent') return advance(state)
   const { euros, cents, ...values } = state.values
   const action = { ...preset, ...values, ...(preset.kind === 'debt' ? { amount: euros + (cents ?? 0) / 100 } : {}) }
+  return submit(action, state, env)
+}
+
+async function submit(action, state, env) {
   try {
     const url = new URL('/api/alexa', env.DASHBOARD_HOUSE_URL)
     if (url.protocol !== 'https:' || !env.ALEXA_SKILL_SECRET) throw new Error('Configuration Alexa incomplète')
