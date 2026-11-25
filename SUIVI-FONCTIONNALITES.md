@@ -4,6 +4,7 @@ Chaque nouvelle branche de fonctionnalité part de `develop` sur le fork, car `m
 
 | Branche | Fonctionnalité | Dépendances et risques de fusion | Ordre de fusion |
 | --- | --- | --- | --- |
+| `feature/charlie-sur-sonnette` | Ajoute aussi la tête de Charlie à la sonnette pour la garde chez la co-famille. | Dépend de `feature/pictos-garde-charlie-sonnette` et réutilise la même image et le même placement. | Après `feature/pictos-garde-charlie-sonnette`. |
 | `feature/pictos-garde-charlie-sonnette` | Affiche une maison avec la tête de Charlie pour la garde à domicile et une sonnette pour la co-famille. | Dépend de `feature/style-pictos-garde`, réutilise la mascotte existante et conserve la position en bas à droite. | Après `feature/style-pictos-garde`. |
 | `feature/style-pictos-garde` | Déplace le lieu de garde dans le coin inférieur droit de chaque vignette et utilise des maisons filaires. | Dépend de `feature/pictos-garde-par-jour` et modifie son rendu dans `app.js` et `style.css`. Le cycle de garde est conservé. | Après `feature/pictos-garde-par-jour`. |
 | `feature/pictos-garde-par-jour` | Affiche le lieu de garde sous chaque vignette météo les jours de semaine. | Dépend de `feature/picto-garde-meteo` et remplace son affichage dans `weatherCard` et `style.css`. Le calendrier de garde reste identique. | Après `feature/picto-garde-meteo`, déjà intégrée dans `develop`. |
