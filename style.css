@@ -1341,11 +1341,11 @@ body[data-tab="maison"] .addgrp{display:flex}
 .sc-weather-hours li+li{border-left:1px solid rgba(141,123,240,.18)}
 .sc-weather-hours svg{width:20px;height:20px;flex-shrink:0}
 .sc-weather-hours b{color:var(--ink)}
-.sc-weather-days .sc-childcare-badge{position:absolute;right:4px;bottom:3px;display:grid;place-items:center;color:#305d91}
-.sc-weather-days .sc-childcare-badge.is-home{color:#267044}
-.sc-weather-days .sc-childcare-badge svg{width:13px;height:13px}
+.sc-weather-days .sc-childcare-badge{position:absolute;right:4px;bottom:3px;display:grid;place-items:center;width:22px;height:17px;border-radius:6px;background:#d9e8f7;font-size:12px;line-height:1}
+.sc-weather-days .sc-childcare-badge.is-home{background:#d5eedc}
+.sc-childcare-charlie{position:absolute;top:-3px;right:-2px;width:11px;height:11px}
 .sc-weather-days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:8px}
-.sc-weather-days button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;padding:6px 1px 15px;border:1px solid transparent;border-radius:14px;background:rgba(255,255,255,.88);color:var(--ink2);font:inherit;font-size:clamp(10px,2.8vw,12px);font-weight:700;white-space:nowrap;cursor:pointer}
+.sc-weather-days button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;padding:6px 1px 23px;border:1px solid transparent;border-radius:14px;background:rgba(255,255,255,.88);color:var(--ink2);font:inherit;font-size:clamp(10px,2.8vw,12px);font-weight:700;white-space:nowrap;cursor:pointer}
 .sc-weather-days button[aria-pressed="true"]{border-color:var(--lav);background:#F3F0FF;color:var(--ink)}
 .sc-weather-days svg{width:27px;height:27px}
 .sc-weather-dots{display:flex;justify-content:center}
