@@ -192,21 +192,35 @@ export async function searchAgenda(env: NodeJS.ProcessEnv, from: string, to: str
   return { calendars, events: [...events.values()].sort((a, b) => sortKey(a).localeCompare(sortKey(b))) }
 }
 
-export async function createAgendaEvent(env: NodeJS.ProcessEnv, calendarId: string, title: string, start: string, end: string, allDay = false) {
+export function alexaCalendarKey(env: NodeJS.ProcessEnv) {
+  const rawId = env.ALEXA_CALENDAR_ID?.trim()
+  return rawId && calendarIds(env).includes(rawId) ? hash(rawId) : undefined
+}
+
+export async function createAgendaEvent(env: NodeJS.ProcessEnv, calendarId: string, title: string, start: string, end: string, allDay = false, stableId?: string) {
   const rawId = calendarIds(env).find(id => hash(id) === calendarId)
   if (!rawId) throw new Error('Unknown configured Google calendar')
   const token = await googleAccessToken(env)
   const url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(rawId) + '/events'
   const nextDay = (date: string) => new Date(Date.parse(date + 'T00:00:00Z') + 864e5).toISOString().slice(0, 10)
-  const event = await json<GoogleEvent>(url, {
+  const options: RequestInit = {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      ...(stableId ? { id: stableId } : {}),
       summary: title,
       start: allDay ? { date: start } : { dateTime: start + ':00', timeZone: 'Europe/Paris' },
       end: allDay ? { date: nextDay(end) } : { dateTime: end + ':00', timeZone: 'Europe/Paris' },
     }),
-  })
+  }
+  let event: GoogleEvent
+  try {
+    event = await json<GoogleEvent>(url, options)
+  } catch (error) {
+    if (!stableId || !(error instanceof Error) || error.message !== 'Upstream HTTP 409') throw error
+    event = await json<GoogleEvent>(url + '/' + stableId, { headers: { Authorization: 'Bearer ' + token } })
+    if (event.status === 'cancelled' || event.id !== stableId) throw error
+  }
   calendarCache.until = 0
   return { id: hash(event.id + '|' + start) }
 }

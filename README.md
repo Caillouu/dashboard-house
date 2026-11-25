@@ -124,3 +124,7 @@ Chaque opération a un identifiant et une révision. Le serveur reconnaît une r
 La migration se transmet avec la branche `feature/migration-vercel-turso`. Les branches qui utilisent le nouveau socle doivent partir d’une base qui contient déjà cette migration. Au moment de la bascule, intègre la branche de migration dans `main` du fork avant de créer ces nouvelles branches. Les fonctionnalités météo et agenda déjà intégrées restent indépendantes et sont réunies sur `develop`.
 
 L’ancien code Apps Script est conservé dans `apps-script/` pour l’ancienne installation. Les déploiements Vercel embarquent uniquement le build Vite et l’API.
+
+## Ajouts vocaux avec Alexa
+
+Le skill privé français « Maison au quotidien » crée des éléments dans le dashboard après confirmation vocale. Voir le [guide de configuration Alexa](alexa/README.md).

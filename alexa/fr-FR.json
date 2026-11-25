@@ -1,0 +1,391 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "maison au quotidien",
+      "intents": [
+        {
+          "name": "Course",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute {titre} aux courses",
+            "mets {titre} sur la liste des courses"
+          ]
+        },
+        {
+          "name": "Wish",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute {titre} à la wishlist",
+            "ajoute {titre} aux envies"
+          ]
+        },
+        {
+          "name": "Group",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "crée le groupe de routines {titre}",
+            "ajoute un groupe de routines {titre}"
+          ]
+        },
+        {
+          "name": "Routine",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute la tâche de routine {titre}"
+          ]
+        },
+        {
+          "name": "Quest",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute la quête {titre}",
+            "crée la quête {titre}"
+          ]
+        },
+        {
+          "name": "PrivateQuest",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute la quête privée {titre}",
+            "crée la quête privée {titre}"
+          ]
+        },
+        {
+          "name": "Step",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute une étape de quête {titre}",
+            "ajoute la mini quête {titre}"
+          ]
+        },
+        {
+          "name": "Debt",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute la dépense {titre}",
+            "ajoute une dette pour {titre}"
+          ]
+        },
+        {
+          "name": "Trip",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute le voyage {titre}",
+            "crée le voyage {titre}"
+          ]
+        },
+        {
+          "name": "Activity",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute l’activité {titre}"
+          ]
+        },
+        {
+          "name": "Lodging",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute l’hébergement {titre}"
+          ]
+        },
+        {
+          "name": "Journey",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute le trajet de voyage {titre}"
+          ]
+        },
+        {
+          "name": "Transport",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute le transport sur place {titre}"
+          ]
+        },
+        {
+          "name": "Template",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "crée la liste type {titre}",
+            "ajoute la liste type {titre}"
+          ]
+        },
+        {
+          "name": "Pack",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "mets {titre} dans la valise",
+            "ajoute dans la valise {titre}"
+          ]
+        },
+        {
+          "name": "PackCategory",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute la catégorie de valise {titre}"
+          ]
+        },
+        {
+          "name": "TemplateItem",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute à une liste type {titre}"
+          ]
+        },
+        {
+          "name": "TemplateCategory",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute la catégorie de liste type {titre}"
+          ]
+        },
+        {
+          "name": "Event",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute l’événement {titre}",
+            "ajoute le rendez-vous sur la journée {titre}"
+          ]
+        },
+        {
+          "name": "TimedEvent",
+          "slots": [
+            {
+              "name": "titre",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ajoute le rendez-vous {titre}"
+          ]
+        },
+        {
+          "name": "Dictee",
+          "slots": [
+            {
+              "name": "valeur",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "écris {valeur}",
+            "le nom est {valeur}",
+            "note {valeur}"
+          ]
+        },
+        {
+          "name": "DateValeur",
+          "slots": [
+            {
+              "name": "valeur",
+              "type": "AMAZON.DATE"
+            }
+          ],
+          "samples": [
+            "le {valeur}",
+            "c’est le {valeur}"
+          ]
+        },
+        {
+          "name": "HeureValeur",
+          "slots": [
+            {
+              "name": "valeur",
+              "type": "AMAZON.TIME"
+            }
+          ],
+          "samples": [
+            "à {valeur}",
+            "il est {valeur}"
+          ]
+        },
+        {
+          "name": "EurosValeur",
+          "slots": [
+            {
+              "name": "valeur",
+              "type": "AMAZON.NUMBER"
+            }
+          ],
+          "samples": [
+            "{valeur} euros",
+            "{valeur} euro"
+          ]
+        },
+        {
+          "name": "CentimesValeur",
+          "slots": [
+            {
+              "name": "valeur",
+              "type": "AMAZON.NUMBER"
+            }
+          ],
+          "samples": [
+            "{valeur} centimes",
+            "{valeur} centime"
+          ]
+        },
+        {
+          "name": "MembreValeur",
+          "slots": [
+            {
+              "name": "valeur",
+              "type": "MembreDuFoyer"
+            }
+          ],
+          "samples": [
+            "{valeur}",
+            "payé par le {valeur}"
+          ]
+        },
+        {
+          "name": "Passer",
+          "samples": [
+            "passer",
+            "passe",
+            "sans préciser"
+          ]
+        },
+        {
+          "name": "AMAZON.CancelIntent"
+        },
+        {
+          "name": "AMAZON.StopIntent"
+        },
+        {
+          "name": "AMAZON.HelpIntent"
+        },
+        {
+          "name": "AMAZON.YesIntent"
+        },
+        {
+          "name": "AMAZON.NoIntent"
+        },
+        {
+          "name": "AMAZON.FallbackIntent"
+        }
+      ],
+      "types": [
+        {
+          "name": "MembreDuFoyer",
+          "values": [
+            {
+              "id": "p1",
+              "name": {
+                "value": "premier membre",
+                "synonyms": [
+                  "membre un"
+                ]
+              }
+            },
+            {
+              "id": "p2",
+              "name": {
+                "value": "deuxième membre",
+                "synonyms": [
+                  "membre deux",
+                  "second membre"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
