@@ -540,8 +540,8 @@ import { isDisplayableRecord } from './src/records.ts'
       atHome=(day.getTime()-childcareHomeMonday)%(14*86400000)===0;
     }
     var label=atHome?'Garde à la maison':'Garde chez la co-famille';
-    return '<div class="sc-childcare"><span class="sc-childcare-badge'+(atHome?' is-home':'')+
-      '" role="img" aria-label="'+label+'" title="'+label+'">'+(atHome?'🏠':'📍')+'</span></div>';
+    return '<span class="sc-childcare-badge'+(atHome?' is-home':'')+
+      '" role="img" aria-label="'+label+'" title="'+label+'">'+(atHome?'🏠':'📍')+'</span>';
   }
   function weatherCard(slide){
     var weather=slide===0?W:W&&W.auxerre;
@@ -574,12 +574,11 @@ import { isDisplayableRecord } from './src/records.ts'
     }
     h+='</div>';
     if(days.length>1){
-      h+=childcareBadge((forecast||days[0]).date);
       h+='<div class="sc-weather-days" role="group" aria-label="Prévisions par jour">'+days.map(function(day,i){
         var label=i===0?"Aujourd’hui":dayName(day.date,false);
         var active=i===0?!forecast:forecast===day;
-        return '<button type="button" data-act="weather-day" data-id="'+(i===0?'':esc(day.date))+'" aria-pressed="'+active+'" aria-label="'+esc(label+', '+day.label+', minimum '+t(day.low)+', maximum '+t(day.high))+'">'+
-          '<span>'+esc(label)+'</span>'+wIcon(day.cond,day.isDay)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span></button>';
+        return '<div class="sc-weather-day"><button type="button" data-act="weather-day" data-id="'+(i===0?'':esc(day.date))+'" aria-pressed="'+active+'" aria-label="'+esc(label+', '+day.label+', minimum '+t(day.low)+', maximum '+t(day.high))+'">'+
+          '<span>'+esc(label)+'</span>'+wIcon(day.cond,day.isDay)+'<span>'+t(day.low)+' / <b>'+t(day.high)+'</b></span></button>'+childcareBadge(day.date)+'</div>';
       }).join('')+'</div>';
     }
     return h;
